@@ -191,7 +191,11 @@ PETSC_INTERN PetscSpinlock PetscLogSpinLock;
   #if defined(__cplusplus)
     #define PETSC_TLS thread_local
   #else
-    #define PETSC_TLS _Thread_local
+	  #if _MSC_VER
+		#define PETSC_TLS __declspec(thread)
+	  #else
+		#define PETSC_TLS _Thread_local
+	  #endif
   #endif
   #define PETSC_INTERN_TLS extern PETSC_TLS PETSC_VISIBILITY_INTERNAL
 
