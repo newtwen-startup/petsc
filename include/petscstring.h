@@ -252,7 +252,11 @@ static inline PetscErrorCode PetscStrncpy(char s[], const char t[], size_t n)
 #if PetscHasBuiltin(__builtin_strncpy)
     __builtin_strncpy(s, t, n);
 #else
-    strncpy(s, t, n);
+    #if (WIN32)
+        strncpy_s(s, n, t, n);
+    #else
+        strncpy(s, t, n - len);
+    #endif
 #endif
     PETSC_SILENCE_WSTRINGOP_TRUNCATION_END;
     s[n - 1] = '\0';
@@ -293,8 +297,11 @@ static inline PetscErrorCode PetscStrlcat(char s[], const char t[], size_t n)
 #if PetscHasBuiltin(__builtin_strncat)
   __builtin_strncat(s, t, n - len);
 #else
-  strncat(s, t, n - len);
-#endif
+  #if (WIN32)
+    strncat_s(s, n - len, t, n - len);
+  #else
+    strncat(s, t, n - len);
+  #endif
   PETSC_SILENCE_WSTRINGOP_TRUNCATION_END;
   s[n - 1] = '\0';
   PetscFunctionReturn(PETSC_SUCCESS);
