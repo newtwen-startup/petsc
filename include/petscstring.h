@@ -255,7 +255,7 @@ static inline PetscErrorCode PetscStrncpy(char s[], const char t[], size_t n)
     #if (WIN32)
         strncpy_s(s, n, t, n);
     #else
-        strncpy(s, t, n - len);
+        strncpy(s, t, n);
     #endif
 #endif
     PETSC_SILENCE_WSTRINGOP_TRUNCATION_END;
