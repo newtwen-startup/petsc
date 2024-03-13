@@ -302,6 +302,7 @@ static inline PetscErrorCode PetscStrlcat(char s[], const char t[], size_t n)
   #else
     strncat(s, t, n - len);
   #endif
+#endif
   PETSC_SILENCE_WSTRINGOP_TRUNCATION_END;
   s[n - 1] = '\0';
   PetscFunctionReturn(PETSC_SUCCESS);
