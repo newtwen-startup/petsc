@@ -238,10 +238,10 @@ PetscErrorCode InitializeUserData(AppCtx *user)
   PetscCall(MatAssemblyBegin(user->Hz, MAT_FINAL_ASSEMBLY));
   PetscCall(MatAssemblyEnd(user->Hz, MAT_FINAL_ASSEMBLY));
 
-  PetscCall(VecCreate(PETSC_COMM_WORLD, &(user->x)));
-  PetscCall(VecCreate(PETSC_COMM_WORLD, &(user->workM)));
-  PetscCall(VecCreate(PETSC_COMM_WORLD, &(user->workN)));
-  PetscCall(VecCreate(PETSC_COMM_WORLD, &(user->workN2)));
+  PetscCall(VecCreate(PETSC_COMM_WORLD, &user->x));
+  PetscCall(VecCreate(PETSC_COMM_WORLD, &user->workM));
+  PetscCall(VecCreate(PETSC_COMM_WORLD, &user->workN));
+  PetscCall(VecCreate(PETSC_COMM_WORLD, &user->workN2));
   PetscCall(VecSetSizes(user->x, PETSC_DECIDE, user->N));
   PetscCall(VecSetSizes(user->workM, PETSC_DECIDE, user->M));
   PetscCall(VecSetSizes(user->workN, PETSC_DECIDE, user->N));
@@ -251,17 +251,17 @@ PetscErrorCode InitializeUserData(AppCtx *user)
   PetscCall(VecSetFromOptions(user->workN));
   PetscCall(VecSetFromOptions(user->workN2));
 
-  PetscCall(VecDuplicate(user->workN, &(user->workN3)));
-  PetscCall(VecDuplicate(user->x, &(user->xlb)));
-  PetscCall(VecDuplicate(user->x, &(user->xub)));
-  PetscCall(VecDuplicate(user->x, &(user->c)));
+  PetscCall(VecDuplicate(user->workN, &user->workN3));
+  PetscCall(VecDuplicate(user->x, &user->xlb));
+  PetscCall(VecDuplicate(user->x, &user->xub));
+  PetscCall(VecDuplicate(user->x, &user->c));
   PetscCall(VecSet(user->xlb, 0.0));
   PetscCall(VecSet(user->c, 0.0));
   PetscCall(VecSet(user->xub, PETSC_INFINITY));
 
-  PetscCall(MatTransposeMatMult(user->A, user->A, MAT_INITIAL_MATRIX, PETSC_DEFAULT, &(user->ATA)));
-  PetscCall(MatTransposeMatMult(user->A, user->A, MAT_INITIAL_MATRIX, PETSC_DEFAULT, &(user->Hx)));
-  PetscCall(MatTransposeMatMult(user->A, user->A, MAT_INITIAL_MATRIX, PETSC_DEFAULT, &(user->HF)));
+  PetscCall(MatTransposeMatMult(user->A, user->A, MAT_INITIAL_MATRIX, PETSC_DEFAULT, &user->ATA));
+  PetscCall(MatTransposeMatMult(user->A, user->A, MAT_INITIAL_MATRIX, PETSC_DEFAULT, &user->Hx));
+  PetscCall(MatTransposeMatMult(user->A, user->A, MAT_INITIAL_MATRIX, PETSC_DEFAULT, &user->HF));
 
   PetscCall(MatAssemblyBegin(user->ATA, MAT_FINAL_ASSEMBLY));
   PetscCall(MatAssemblyEnd(user->ATA, MAT_FINAL_ASSEMBLY));
@@ -276,10 +276,10 @@ PetscErrorCode InitializeUserData(AppCtx *user)
   user->mumin  = 5.e-6;
 
   PetscOptionsBegin(PETSC_COMM_WORLD, NULL, "Configure separable objection example", "tomographyADMM.c");
-  PetscCall(PetscOptionsInt("-reg", "Regularization scheme for z solver (1,2)", "tomographyADMM.c", user->reg, &(user->reg), NULL));
-  PetscCall(PetscOptionsReal("-lambda", "The regularization multiplier. 1 default", "tomographyADMM.c", user->lambda, &(user->lambda), NULL));
-  PetscCall(PetscOptionsReal("-eps", "L1 norm epsilon padding", "tomographyADMM.c", user->eps, &(user->eps), NULL));
-  PetscCall(PetscOptionsReal("-mumin", "Minimum value for ADMM spectral penalty", "tomographyADMM.c", user->mumin, &(user->mumin), NULL));
+  PetscCall(PetscOptionsInt("-reg", "Regularization scheme for z solver (1,2)", "tomographyADMM.c", user->reg, &user->reg, NULL));
+  PetscCall(PetscOptionsReal("-lambda", "The regularization multiplier. 1 default", "tomographyADMM.c", user->lambda, &user->lambda, NULL));
+  PetscCall(PetscOptionsReal("-eps", "L1 norm epsilon padding", "tomographyADMM.c", user->eps, &user->eps, NULL));
+  PetscCall(PetscOptionsReal("-mumin", "Minimum value for ADMM spectral penalty", "tomographyADMM.c", user->mumin, &user->mumin, NULL));
   PetscOptionsEnd();
   PetscFunctionReturn(PETSC_SUCCESS);
 }
@@ -401,31 +401,31 @@ int main(int argc, char **argv)
    test:
       suffix: 1
       localrunfiles: tomographyData_A_b_xGT
-      args:  -lambda 1.e-8 -tao_monitor -tao_type nls -tao_nls_pc_type icc
+      args: -lambda 1.e-8 -tao_monitor -tao_type nls -tao_nls_pc_type icc
 
    test:
       suffix: 2
       localrunfiles: tomographyData_A_b_xGT
-      args:  -reg 2 -lambda 1.e-8 -tao_admm_dual_update update_basic -tao_admm_regularizer_type regularizer_user -tao_max_it 20 -tao_monitor -tao_admm_tolerance_update_factor 1.e-8  -misfit_tao_nls_pc_type icc -misfit_tao_monitor -reg_tao_monitor
+      args: -reg 2 -lambda 1.e-8 -tao_admm_dual_update update_basic -tao_admm_regularizer_type regularizer_user -tao_max_it 20 -tao_monitor -tao_admm_tolerance_update_factor 1.e-8 -misfit_tao_nls_pc_type icc -misfit_tao_monitor -reg_tao_monitor
 
    test:
       suffix: 3
       localrunfiles: tomographyData_A_b_xGT
-      args:  -lambda 1.e-8 -tao_admm_dual_update update_basic -tao_admm_regularizer_type regularizer_soft_thresh -tao_max_it 20 -tao_monitor -tao_admm_tolerance_update_factor 1.e-8 -misfit_tao_nls_pc_type icc -misfit_tao_monitor
+      args: -lambda 1.e-8 -tao_admm_dual_update update_basic -tao_admm_regularizer_type regularizer_soft_thresh -tao_max_it 20 -tao_monitor -tao_admm_tolerance_update_factor 1.e-8 -misfit_tao_nls_pc_type icc -misfit_tao_monitor
 
    test:
       suffix: 4
       localrunfiles: tomographyData_A_b_xGT
-      args:  -lambda 1.e-8 -tao_admm_dual_update update_adaptive -tao_admm_regularizer_type regularizer_soft_thresh -tao_max_it 20 -tao_monitor -misfit_tao_monitor -misfit_tao_nls_pc_type icc
+      args: -lambda 1.e-8 -tao_admm_dual_update update_adaptive -tao_admm_regularizer_type regularizer_soft_thresh -tao_max_it 20 -tao_monitor -misfit_tao_monitor -misfit_tao_nls_pc_type icc
 
    test:
       suffix: 5
       localrunfiles: tomographyData_A_b_xGT
-      args:  -reg 2 -lambda 1.e-8 -tao_admm_dual_update update_adaptive -tao_admm_regularizer_type regularizer_user -tao_max_it 20 -tao_monitor -tao_admm_tolerance_update_factor 1.e-8 -misfit_tao_monitor -reg_tao_monitor -misfit_tao_nls_pc_type icc
+      args: -reg 2 -lambda 1.e-8 -tao_admm_dual_update update_adaptive -tao_admm_regularizer_type regularizer_user -tao_max_it 20 -tao_monitor -tao_admm_tolerance_update_factor 1.e-8 -misfit_tao_monitor -reg_tao_monitor -misfit_tao_nls_pc_type icc
 
    test:
       suffix: 6
       localrunfiles: tomographyData_A_b_xGT
-      args:  -reg 3 -lambda 1.e-8 -tao_admm_dual_update update_adaptive -tao_admm_regularizer_type regularizer_user -tao_max_it 20 -tao_monitor -tao_admm_tolerance_update_factor 1.e-8 -misfit_tao_monitor -reg_tao_monitor -misfit_tao_nls_pc_type icc
+      args: -reg 3 -lambda 1.e-8 -tao_admm_dual_update update_adaptive -tao_admm_regularizer_type regularizer_user -tao_max_it 20 -tao_monitor -tao_admm_tolerance_update_factor 1.e-8 -misfit_tao_monitor -reg_tao_monitor -misfit_tao_nls_pc_type icc
 
 TEST*/

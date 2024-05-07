@@ -207,7 +207,7 @@ static PetscErrorCode PetscLogGetHandler(PetscLogHandlerType type, PetscLogHandl
   Output Parameter:
 . state - The `PetscLogState` changed by registrations (such as
           `PetscLogEventRegister()`) and actions (such as `PetscLogEventBegin()` or
-          `PetscLogStagePush()`), or NULL if logging is not active
+          `PetscLogStagePush()`), or `NULL` if logging is not active
 
   Level: developer
 
@@ -244,7 +244,6 @@ static PetscErrorCode PetscLogHandlerCopyToHot(PetscLogHandler h, PetscLogHandle
   Level: developer
 
   Notes:
-
   Users should only need this if they create their own log handlers: handlers that are started
   from the command line (such as `-log_view` and `-log_trace`) or from a function like
   `PetscLogNestedBegin()` will automatically be started.
@@ -256,9 +255,9 @@ static PetscErrorCode PetscLogHandlerCopyToHot(PetscLogHandler h, PetscLogHandle
   When a log handler is started, stages that have already been pushed with `PetscLogStagePush()`,
   will be pushed for the new log handler, but it will not be informed of any events that are
   in progress.  It is recommended to start any user-defined log handlers immediately following
-  before any user-defined stages are pushed.
+  `PetscInitialize()`  before any user-defined stages are pushed.
 
-.seealso: [](ch_profiling), `PetscLogHandler`, `PetscLogState`, `PetscLogHandlerStop()`
+.seealso: [](ch_profiling), `PetscLogHandler`, `PetscLogState`, `PetscLogHandlerStop()`, `PetscInitialize()`
 @*/
 PetscErrorCode PetscLogHandlerStart(PetscLogHandler h)
 {
@@ -439,7 +438,7 @@ PETSC_INTERN PetscErrorCode PetscLogTypeBegin(PetscLogHandlerType type)
 
   Options Database Key:
 . -log_view [viewertype:filename:viewerformat] - Prints summary of flop and timing information to the
-                  screen (for code configured with --with-log=1 (which is the default))
+                                                 screen (for code configured with --with-log=1 (which is the default))
 
   Example Usage:
 .vb
@@ -492,6 +491,7 @@ PetscErrorCode PetscLogDefaultBegin(void)
 PetscErrorCode PetscLogTraceBegin(FILE *file)
 {
   PetscLogHandler handler;
+
   PetscFunctionBegin;
   PetscCall(PetscLogTryGetHandler(PETSCLOGHANDLERTRACE, &handler));
   if (handler) PetscFunctionReturn(PETSC_SUCCESS);
@@ -1067,7 +1067,7 @@ PetscErrorCode PetscLogEventRegister(const char name[], PetscClassId classid, Pe
 /*@
   PetscLogEventSetCollective - Indicates that a particular event is collective.
 
-  Not Collective
+  Logically Collective
 
   Input Parameters:
 + event      - The event id
@@ -1078,9 +1078,9 @@ PetscErrorCode PetscLogEventRegister(const char name[], PetscClassId classid, Pe
   Notes:
   New events returned from `PetscLogEventRegister()` are collective by default.
 
-  Collective events are handled specially if the -log_sync is used. In that case the logging saves information about
+  Collective events are handled specially if the command line option -log_sync is used. In that case the logging saves information about
   two parts of the event; the time for all the MPI ranks to synchronize and then the time for the actual computation/communication
-  to be performed. This option is useful to debug imbalance within the computations or communications
+  to be performed. This option is useful to debug imbalance within the computations or communications.
 
 .seealso: [](ch_profiling), `PetscLogEventBegin()`, `PetscLogEventEnd()`, `PetscLogEventRegister()`
 @*/
@@ -1539,7 +1539,7 @@ M*/
   This is a low level routine used by the logging functions in PETSc.
 
   A `PETSCLOGHANDLERDEFAULT` must be running for this to work, having been started either with
-  `PetscLogDefaultBegin()` or from the command line wth `-log_view`.  If it was not started,
+  `PetscLogDefaultBegin()` or from the command line with `-log_view`.  If it was not started,
   all performance statistics in `info` will be zeroed.
 
 .seealso: [](ch_profiling), `PetscLogEventRegister()`, `PetscLogEventBegin()`, `PetscLogEventEnd()`, `PetscLogGetDefaultHandler()`
@@ -1578,7 +1578,7 @@ PetscErrorCode PetscLogStageGetPerfInfo(PetscLogStage stage, PetscEventPerfInfo 
   This is a low level routine used by the logging functions in PETSc
 
   A `PETSCLOGHANDLERDEFAULT` must be running for this to work, having been started either with
-  `PetscLogDefaultBegin()` or from the command line wth `-log_view`.  If it was not started,
+  `PetscLogDefaultBegin()` or from the command line with `-log_view`.  If it was not started,
   all performance statistics in `info` will be zeroed.
 
 .seealso: [](ch_profiling), `PetscLogEventRegister()`, `PetscLogEventBegin()`, `PetscLogEventEnd()`, `PetscLogGetDefaultHandler()`
@@ -2068,7 +2068,7 @@ PetscErrorCode PetscLogViewFromOptions(void)
     PetscCall(PetscViewerPushFormat(viewers[i], formats[i]));
     PetscCall(PetscLogView(viewers[i]));
     PetscCall(PetscViewerPopFormat(viewers[i]));
-    PetscCall(PetscViewerDestroy(&(viewers[i])));
+    PetscCall(PetscOptionsRestoreViewer(&viewers[i]));
   }
   PetscFunctionReturn(PETSC_SUCCESS);
 }

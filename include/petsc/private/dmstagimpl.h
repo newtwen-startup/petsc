@@ -22,7 +22,8 @@ typedef struct {
   PetscInt          nRanks[DMSTAG_MAX_DIM];       /* Ranks in each direction           */
 
   /* Fields unrelated to setup */
-  DMType coordinateDMType; /* DM type to create for coordinates */
+  DMType   coordinateDMType;             /* DM type to create for coordinates */
+  PetscInt refineFactor[DMSTAG_MAX_DIM]; /* Ratio used in refining and coarsening */
 
   /* Data above is copied by DMStagDuplicateWithoutSetup(), while data below is not */
 
@@ -34,6 +35,7 @@ typedef struct {
   PetscMPIInt *neighbors;                  /* dim^3 local ranks                 */
   VecScatter   gtol;                       /* Global --> Local                  */
   VecScatter   ltog_injective;             /* Local  --> Global, injective      */
+  VecScatter   ltol;                       /* Local  --> Local                  */
   PetscInt    *locationOffsets;            /* Offsets for points in loc. rep.   */
 
   /* Additional convenience fields populated by DMSetUp() (easily computed from the above) */
@@ -56,15 +58,18 @@ PETSC_INTERN PetscErrorCode DMSetUp_Stag_3d(DM);
 PETSC_INTERN PetscErrorCode DMStagRestrictSimple_1d(DM, Vec, DM, Vec);
 PETSC_INTERN PetscErrorCode DMStagRestrictSimple_2d(DM, Vec, DM, Vec);
 PETSC_INTERN PetscErrorCode DMStagRestrictSimple_3d(DM, Vec, DM, Vec);
-PETSC_INTERN PetscErrorCode DMStagPopulateInterpolation1d_a_b_Private(DM, DM, Mat);
-PETSC_INTERN PetscErrorCode DMStagPopulateInterpolation2d_0_a_b_Private(DM, DM, Mat);
-PETSC_INTERN PetscErrorCode DMStagPopulateInterpolation3d_0_0_a_b_Private(DM, DM, Mat);
+PETSC_INTERN PetscErrorCode DMStagPopulateInterpolation1d_Internal(DM, DM, Mat);
+PETSC_INTERN PetscErrorCode DMStagPopulateInterpolation2d_Internal(DM, DM, Mat);
+PETSC_INTERN PetscErrorCode DMStagPopulateInterpolation3d_Internal(DM, DM, Mat);
 PETSC_INTERN PetscErrorCode DMStagPopulateLocalToGlobalInjective_1d(DM);
 PETSC_INTERN PetscErrorCode DMStagPopulateLocalToGlobalInjective_2d(DM);
 PETSC_INTERN PetscErrorCode DMStagPopulateLocalToGlobalInjective_3d(DM);
-PETSC_INTERN PetscErrorCode DMStagPopulateRestriction1d_a_b_Private(DM, DM, Mat);
-PETSC_INTERN PetscErrorCode DMStagPopulateRestriction2d_0_a_b_Private(DM, DM, Mat);
-PETSC_INTERN PetscErrorCode DMStagPopulateRestriction3d_0_0_a_b_Private(DM, DM, Mat);
+PETSC_INTERN PetscErrorCode DMStagPopulateLocalToLocal1d_Internal(DM);
+PETSC_INTERN PetscErrorCode DMStagPopulateLocalToLocal2d_Internal(DM);
+PETSC_INTERN PetscErrorCode DMStagPopulateLocalToLocal3d_Internal(DM);
+PETSC_INTERN PetscErrorCode DMStagPopulateRestriction1d_Internal(DM, DM, Mat);
+PETSC_INTERN PetscErrorCode DMStagPopulateRestriction2d_Internal(DM, DM, Mat);
+PETSC_INTERN PetscErrorCode DMStagPopulateRestriction3d_Internal(DM, DM, Mat);
 PETSC_INTERN PetscErrorCode DMStagSetUniformCoordinatesExplicit_1d(DM, PetscReal, PetscReal);
 PETSC_INTERN PetscErrorCode DMStagSetUniformCoordinatesExplicit_2d(DM, PetscReal, PetscReal, PetscReal, PetscReal);
 PETSC_INTERN PetscErrorCode DMStagSetUniformCoordinatesExplicit_3d(DM, PetscReal, PetscReal, PetscReal, PetscReal, PetscReal, PetscReal);

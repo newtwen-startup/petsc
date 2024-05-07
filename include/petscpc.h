@@ -133,6 +133,9 @@ PETSC_EXTERN PetscErrorCode PCJacobiSetUseAbs(PC, PetscBool);
 PETSC_EXTERN PetscErrorCode PCJacobiGetUseAbs(PC, PetscBool *);
 PETSC_EXTERN PetscErrorCode PCJacobiSetFixDiagonal(PC, PetscBool);
 PETSC_EXTERN PetscErrorCode PCJacobiGetFixDiagonal(PC, PetscBool *);
+PETSC_EXTERN PetscErrorCode PCJacobiGetDiagonal(PC pc, Vec, Vec);
+PETSC_EXTERN PetscErrorCode PCJacobiSetRowl1Scale(PC, PetscReal);
+PETSC_EXTERN PetscErrorCode PCJacobiGetRowl1Scale(PC, PetscReal *);
 PETSC_EXTERN PetscErrorCode PCSORSetSymmetric(PC, MatSORType);
 PETSC_EXTERN PetscErrorCode PCSORGetSymmetric(PC, MatSORType *);
 PETSC_EXTERN PetscErrorCode PCSORSetOmega(PC, PetscReal);
@@ -341,6 +344,9 @@ PETSC_EXTERN PetscErrorCode PCGAMGCreateGraph(PC, Mat, Mat *);
 PETSC_EXTERN PetscErrorCode PCGAMGSetAggressiveSquareGraph(PC, PetscBool);
 PETSC_EXTERN PetscErrorCode PCGAMGMISkSetMinDegreeOrdering(PC, PetscBool);
 PETSC_EXTERN PetscErrorCode PCGAMGMISkSetAggressive(PC, PetscInt);
+PETSC_EXTERN PetscErrorCode PCGAMGASMSetHEM(PC, PetscInt);
+PETSC_EXTERN PetscErrorCode PCGAMGSetLowMemoryFilter(PC, PetscBool);
+PETSC_EXTERN PetscErrorCode PCGAMGSetInjectionIndex(PC, PetscInt, PetscInt[]);
 
 PETSC_EXTERN PetscErrorCode PCGAMGClassicalSetType(PC, PCGAMGClassicalType);
 PETSC_EXTERN PetscErrorCode PCGAMGClassicalGetType(PC, PCGAMGClassicalType *);
@@ -470,6 +476,7 @@ PETSC_EXTERN PetscErrorCode PCLMVMSetMatLMVM(PC, Mat);
 PETSC_EXTERN PetscErrorCode PCLMVMGetMatLMVM(PC, Mat *);
 PETSC_EXTERN PetscErrorCode PCLMVMSetIS(PC, IS);
 PETSC_EXTERN PetscErrorCode PCLMVMClearIS(PC);
+PETSC_EXTERN PetscErrorCode PCLMVMSetUpdateVec(PC, Vec);
 
 PETSC_EXTERN PetscErrorCode PCExoticSetType(PC, PCExoticType);
 

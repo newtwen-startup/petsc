@@ -15,6 +15,10 @@
 
 using namespace Petsc::device;
 
+#if defined(PETSC_HAVE_CUPM)
+int PetscDeviceCUPMRuntimeArch = 0;
+#endif
+
 namespace
 {
 
@@ -251,7 +255,6 @@ PetscErrorCode PetscDeviceView(PetscDevice device, PetscViewer viewer)
     // undo the ASCII specific stuff
     PetscCall(PetscViewerASCIIPopTab(sub));
     PetscCall(PetscViewerRestoreSubViewer(viewer, PETSC_COMM_SELF, &sub));
-    PetscCall(PetscViewerFlush(viewer));
   }
   PetscFunctionReturn(PETSC_SUCCESS);
 }

@@ -24,6 +24,7 @@ PetscErrorCode CheckResult(KSP *ksp, Mat *A, Vec *b, Vec *x, IS *rowperm)
 {
   PetscReal norm; /* norm of solution error */
   PetscInt  its;
+
   PetscFunctionBegin;
   PetscCall(KSPGetTotalIterations(*ksp, &its));
   PetscCall(PetscPrintf(PETSC_COMM_WORLD, "Number of iterations = %" PetscInt_FMT "\n", its));
@@ -59,8 +60,15 @@ PetscErrorCode CreateSystem(const char filename[PETSC_MAX_PATH_LEN], RHSType rhs
 
   /* load the matrix and vector; then destroy the viewer */
   PetscCall(MatCreate(PETSC_COMM_WORLD, &A));
-  PetscCall(MatSetFromOptions(A));
   PetscCall(MatLoad(A, viewer));
+  if (permute) {
+    Mat Aperm;
+    PetscCall(MatGetOrdering(A, ordering, &rowperm, &colperm));
+    PetscCall(MatPermute(A, rowperm, colperm, &Aperm));
+    PetscCall(MatDestroy(&A));
+    A = Aperm; /* Replace original operator with permuted version */
+  }
+  PetscCall(MatSetFromOptions(A));
   switch (rhstype) {
   case RHS_FILE:
     /* Vectors in the file might a different size than the matrix so we need a
@@ -108,12 +116,7 @@ PetscErrorCode CreateSystem(const char filename[PETSC_MAX_PATH_LEN], RHSType rhs
   PetscCall(VecDuplicate(b, &x));
 
   if (permute) {
-    Mat Aperm;
-    PetscCall(MatGetOrdering(A, ordering, &rowperm, &colperm));
-    PetscCall(MatPermute(A, rowperm, colperm, &Aperm));
     PetscCall(VecPermute(b, rowperm, PETSC_FALSE));
-    PetscCall(MatDestroy(&A));
-    A = Aperm; /* Replace original operator with permuted version */
     PetscCall(ISDestroy(&rowperm));
   }
 
@@ -121,7 +124,6 @@ PetscErrorCode CreateSystem(const char filename[PETSC_MAX_PATH_LEN], RHSType rhs
   *x_out       = x;
   *A_out       = A;
   *colperm_out = colperm;
-
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 

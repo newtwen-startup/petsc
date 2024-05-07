@@ -658,7 +658,6 @@ PetscErrorCode MatSetValuesBlocked_SeqSBAIJ(Mat A, PetscInt m, const PetscInt im
   PetscFunctionBegin;
   if (roworiented) stepval = (n - 1) * bs;
   else stepval = (m - 1) * bs;
-
   for (k = 0; k < m; k++) { /* loop over added rows */
     row = im[k];
     if (row < 0) continue;
@@ -1089,24 +1088,10 @@ static PetscErrorCode MatAXPY_SeqSBAIJ(Mat Y, PetscScalar a, Mat X, MatStructure
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
-static PetscErrorCode MatIsSymmetric_SeqSBAIJ(Mat A, PetscReal tol, PetscBool *flg)
-{
-  PetscFunctionBegin;
-  *flg = PETSC_TRUE;
-  PetscFunctionReturn(PETSC_SUCCESS);
-}
-
 static PetscErrorCode MatIsStructurallySymmetric_SeqSBAIJ(Mat A, PetscBool *flg)
 {
   PetscFunctionBegin;
   *flg = PETSC_TRUE;
-  PetscFunctionReturn(PETSC_SUCCESS);
-}
-
-static PetscErrorCode MatIsHermitian_SeqSBAIJ(Mat A, PetscReal tol, PetscBool *flg)
-{
-  PetscFunctionBegin;
-  *flg = PETSC_FALSE;
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
@@ -1159,7 +1144,7 @@ static PetscErrorCode MatZeroRowsColumns_SeqSBAIJ(Mat A, PetscInt is_n, const Pe
   PetscBool         *zeroed, vecs = PETSC_FALSE;
 
   PetscFunctionBegin;
-  /* fix right hand side if needed */
+  /* fix right-hand side if needed */
   if (x && b) {
     PetscCall(VecGetArrayRead(x, &xx));
     PetscCall(VecGetArray(b, &bb));
@@ -1179,7 +1164,7 @@ static PetscErrorCode MatZeroRowsColumns_SeqSBAIJ(Mat A, PetscInt is_n, const Pe
         for (k = 0; k < bs; k++) {
           col = bs * baij->j[j] + k;
           if (col <= i) continue;
-          aa = ((MatScalar *)(baij->a)) + j * bs2 + (i % bs) + bs * k;
+          aa = ((MatScalar *)baij->a) + j * bs2 + (i % bs) + bs * k;
           if (!zeroed[i] && zeroed[col]) bb[i] -= aa[0] * xx[col];
           if (zeroed[i] && !zeroed[col]) bb[col] -= aa[0] * xx[i];
         }
@@ -1195,7 +1180,7 @@ static PetscErrorCode MatZeroRowsColumns_SeqSBAIJ(Mat A, PetscInt is_n, const Pe
         for (k = 0; k < bs; k++) {
           col = bs * baij->j[j] + k;
           if (zeroed[col]) {
-            aa    = ((MatScalar *)(baij->a)) + j * bs2 + (i % bs) + bs * k;
+            aa    = ((MatScalar *)baij->a) + j * bs2 + (i % bs) + bs * k;
             aa[0] = 0.0;
           }
         }
@@ -1212,7 +1197,7 @@ static PetscErrorCode MatZeroRowsColumns_SeqSBAIJ(Mat A, PetscInt is_n, const Pe
   for (i = 0; i < is_n; i++) {
     row   = is_idx[i];
     count = (baij->i[row / bs + 1] - baij->i[row / bs]) * bs;
-    aa    = ((MatScalar *)(baij->a)) + baij->i[row / bs] * bs2 + (row % bs);
+    aa    = ((MatScalar *)baij->a) + baij->i[row / bs] * bs2 + (row % bs);
     for (k = 0; k < count; k++) {
       aa[0] = zero;
       aa += bs;
@@ -1364,8 +1349,8 @@ static struct _MatOps MatOps_Values = {MatSetValues_SeqSBAIJ,
                                        NULL,
                                        MatGetInertia_SeqSBAIJ,
                                        MatLoad_SeqSBAIJ,
-                                       /* 84*/ MatIsSymmetric_SeqSBAIJ,
-                                       MatIsHermitian_SeqSBAIJ,
+                                       /* 84*/ NULL,
+                                       NULL,
                                        MatIsStructurallySymmetric_SeqSBAIJ,
                                        NULL,
                                        NULL,
@@ -1431,7 +1416,8 @@ static struct _MatOps MatOps_Values = {MatSetValues_SeqSBAIJ,
                                        NULL,
                                        NULL,
                                        /*150*/ NULL,
-                                       MatEliminateZeros_SeqSBAIJ};
+                                       MatEliminateZeros_SeqSBAIJ,
+                                       NULL};
 
 static PetscErrorCode MatStoreValues_SeqSBAIJ(Mat mat)
 {
@@ -1625,9 +1611,11 @@ static PetscErrorCode MatSeqSBAIJSetPreallocation_SeqSBAIJ(Mat B, PetscInt bs, P
 
 static PetscErrorCode MatSeqSBAIJSetPreallocationCSR_SeqSBAIJ(Mat B, PetscInt bs, const PetscInt ii[], const PetscInt jj[], const PetscScalar V[])
 {
-  PetscInt     i, j, m, nz, anz, nz_max = 0, *nnz;
-  PetscScalar *values      = NULL;
-  PetscBool    roworiented = ((Mat_SeqSBAIJ *)B->data)->roworiented;
+  PetscInt      i, j, m, nz, anz, nz_max = 0, *nnz;
+  PetscScalar  *values      = NULL;
+  Mat_SeqSBAIJ *b           = (Mat_SeqSBAIJ *)B->data;
+  PetscBool     roworiented = b->roworiented;
+  PetscBool     ilw         = b->ignore_ltriangular;
 
   PetscFunctionBegin;
   PetscCheck(bs >= 1, PetscObjectComm((PetscObject)B), PETSC_ERR_ARG_OUTOFRANGE, "Invalid block size specified, must be positive but it is %" PetscInt_FMT, bs);
@@ -1643,6 +1631,7 @@ static PetscErrorCode MatSeqSBAIJSetPreallocationCSR_SeqSBAIJ(Mat B, PetscInt bs
   for (i = 0; i < m; i++) {
     nz = ii[i + 1] - ii[i];
     PetscCheck(nz >= 0, PETSC_COMM_SELF, PETSC_ERR_ARG_OUTOFRANGE, "Row %" PetscInt_FMT " has a negative number of columns %" PetscInt_FMT, i, nz);
+    PetscCheckSorted(nz, jj + ii[i]);
     anz = 0;
     for (j = 0; j < nz; j++) {
       /* count only values on the diagonal or above */
@@ -1651,7 +1640,7 @@ static PetscErrorCode MatSeqSBAIJSetPreallocationCSR_SeqSBAIJ(Mat B, PetscInt bs
         break;
       }
     }
-    nz_max = PetscMax(nz_max, anz);
+    nz_max = PetscMax(nz_max, nz);
     nnz[i] = anz;
   }
   PetscCall(MatSeqSBAIJSetPreallocation(B, bs, 0, nnz));
@@ -1659,9 +1648,11 @@ static PetscErrorCode MatSeqSBAIJSetPreallocationCSR_SeqSBAIJ(Mat B, PetscInt bs
 
   values = (PetscScalar *)V;
   if (!values) PetscCall(PetscCalloc1(bs * bs * nz_max, &values));
+  b->ignore_ltriangular = PETSC_TRUE;
   for (i = 0; i < m; i++) {
     PetscInt        ncols = ii[i + 1] - ii[i];
     const PetscInt *icols = jj + ii[i];
+
     if (!roworiented || bs == 1) {
       const PetscScalar *svals = values + (V ? (bs * bs * ii[i]) : 0);
       PetscCall(MatSetValuesBlocked_SeqSBAIJ(B, 1, &i, ncols, icols, svals, INSERT_VALUES));
@@ -1676,6 +1667,7 @@ static PetscErrorCode MatSeqSBAIJSetPreallocationCSR_SeqSBAIJ(Mat B, PetscInt bs
   PetscCall(MatAssemblyBegin(B, MAT_FINAL_ASSEMBLY));
   PetscCall(MatAssemblyEnd(B, MAT_FINAL_ASSEMBLY));
   PetscCall(MatSetOption(B, MAT_NEW_NONZERO_LOCATION_ERR, PETSC_TRUE));
+  b->ignore_ltriangular = ilw;
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
@@ -1846,11 +1838,11 @@ PetscErrorCode MatSeqSBAIJRestoreArray(Mat A, PetscScalar **array)
   Level: beginner
 
   Notes:
-    By default if you insert values into the lower triangular part of the matrix they are simply ignored (since they are not
-     stored and it is assumed they symmetric to the upper triangular). If you call `MatSetOption`(`Mat`,`MAT_IGNORE_LOWER_TRIANGULAR`,`PETSC_FALSE`) or use
-     the options database `-mat_ignore_lower_triangular` false it will generate an error if you try to set a value in the lower triangular portion.
+  By default if you insert values into the lower triangular part of the matrix they are simply ignored (since they are not
+  stored and it is assumed they symmetric to the upper triangular). If you call `MatSetOption`(`Mat`,`MAT_IGNORE_LOWER_TRIANGULAR`,`PETSC_FALSE`) or use
+  the options database `-mat_ignore_lower_triangular` false it will generate an error if you try to set a value in the lower triangular portion.
 
-    The number of rows in the matrix must be less than or equal to the number of columns
+  The number of rows in the matrix must be less than or equal to the number of columns
 
 .seealso: [](ch_matrices), `Mat`, `MATSEQSBAIJ`, `MatCreateSeqSBAIJ()`, `MatType`, `MATMPISBAIJ`
 M*/
@@ -1951,14 +1943,13 @@ PETSC_EXTERN PetscErrorCode MatCreate_SeqSBAIJ(Mat B)
   Input Parameters:
 + B   - the symmetric matrix
 . bs  - size of block, the blocks are ALWAYS square. One can use `MatSetBlockSizes()` to set a different row and column blocksize but the row
-          blocksize always defines the size of the blocks. The column blocksize sets the blocksize of the vectors obtained with `MatCreateVecs()`
+        blocksize always defines the size of the blocks. The column blocksize sets the blocksize of the vectors obtained with `MatCreateVecs()`
 . nz  - number of block nonzeros per block row (same for all rows)
 - nnz - array containing the number of block nonzeros in the upper triangular plus
-         diagonal portion of each block (possibly different for each block row) or `NULL`
+        diagonal portion of each block (possibly different for each block row) or `NULL`
 
   Options Database Keys:
-+ -mat_no_unroll  - uses code that does not unroll the loops in the
-                     block calculations (much slower)
++ -mat_no_unroll  - uses code that does not unroll the loops in the block calculations (much slower)
 - -mat_block_size - size of the blocks to use (only works if a negative bs is passed in
 
   Level: intermediate
@@ -1993,20 +1984,22 @@ PetscErrorCode MatSeqSBAIJSetPreallocation(Mat B, PetscInt bs, PetscInt nz, cons
   Input Parameters:
 + B  - the matrix
 . bs - size of block, the blocks are ALWAYS square.
-. i  - the indices into j for the start of each local row (starts with zero)
-. j  - the column indices for each local row (starts with zero) these must be sorted for each row
-- v  - optional values in the matrix
+. i  - the indices into `j` for the start of each local row (indices start with zero)
+. j  - the column indices for each local row (indices start with zero) these must be sorted for each row
+- v  - optional values in the matrix, use `NULL` if not provided
 
   Level: advanced
 
   Notes:
+  The `i`,`j`,`v` values are COPIED with this routine; to avoid the copy use `MatCreateSeqSBAIJWithArrays()`
+
   The order of the entries in values is specified by the `MatOption` `MAT_ROW_ORIENTED`.  For example, C programs
   may want to use the default `MAT_ROW_ORIENTED` = `PETSC_TRUE` and use an array v[nnz][bs][bs] where the second index is
   over rows within a block and the last index is over columns within a block row.  Fortran programs will likely set
   `MAT_ROW_ORIENTED` = `PETSC_FALSE` and use a Fortran array v(bs,bs,nnz) in which the first index is over rows within a
   block column and the second index is over columns within a block.
 
-  Any entries below the diagonal are ignored
+  Any entries provided that lie below the diagonal are ignored
 
   Though this routine has Preallocation() in the name it also sets the exact nonzero locations of the matrix entries
   and usually the numerical values as well
@@ -2045,8 +2038,7 @@ PetscErrorCode MatSeqSBAIJSetPreallocationCSR(Mat B, PetscInt bs, const PetscInt
 . A - the symmetric matrix
 
   Options Database Keys:
-+ -mat_no_unroll  - uses code that does not unroll the loops in the
-                     block calculations (much slower)
++ -mat_no_unroll  - uses code that does not unroll the loops in the block calculations (much slower)
 - -mat_block_size - size of the blocks to use
 
   Level: intermediate

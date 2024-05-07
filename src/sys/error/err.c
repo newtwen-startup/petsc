@@ -298,7 +298,7 @@ PetscErrorCode PetscErrorMessage(PetscErrorCode errnum, const char *text[], char
 
 #if defined(PETSC_CLANGUAGE_CXX)
   /* C++ exceptions are formally not allowed to propagate through extern "C" code. In practice, far too much software
- * would be broken if implementations did not handle it it some common cases. However, keep in mind
+ * would be broken if implementations did not handle it in some common cases. However, keep in mind
  *
  *   Rule 62. Don't allow exceptions to propagate across module boundaries
  *
@@ -438,7 +438,7 @@ PetscErrorCode PetscError(MPI_Comm comm, int line, const char *func, const char 
   Level: intermediate
 
   Note:
-  This may be called from within the debugger
+  This may be called from within the debugger, passing 0 as the viewer
 
   Developer Note:
   `idx` cannot be const because may be passed to binary viewer where temporary byte swapping may be done
@@ -535,7 +535,7 @@ PetscErrorCode PetscIntView(PetscInt N, const PetscInt idx[], PetscViewer viewer
   Level: intermediate
 
   Note:
-  This may be called from within the debugger
+  This may be called from within the debugger, passing 0 as the viewer
 
   Developer Note:
   `idx` cannot be const because may be passed to binary viewer where temporary byte swapping may be done
@@ -640,7 +640,7 @@ PetscErrorCode PetscRealView(PetscInt N, const PetscReal idx[], PetscViewer view
   Level: intermediate
 
   Note:
-  This may be called from within the debugger
+  This may be called from within the debugger, passing 0 as the viewer
 
   Developer Note:
   `idx` cannot be const because may be passed to binary viewer where byte swapping may be done

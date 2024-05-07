@@ -323,7 +323,7 @@ int main(int argc, char **argv)
   PetscCall(DMCreateGlobalVector(dm, &u));
   PetscCall(VecSet(u, 0.0));
   PetscCall(PetscObjectSetName((PetscObject)u, "potential"));
-  PetscCall(DMPlexSetSNESLocalFEM(dm, &user, &user, &user));
+  PetscCall(DMPlexSetSNESLocalFEM(dm, PETSC_FALSE, &user));
   PetscCall(SNESSetFromOptions(snes));
   PetscCall(DMSNESCheckFromOptions(snes, u));
   PetscCall(SNESSolve(snes, NULL, u));
@@ -349,6 +349,57 @@ int main(int argc, char **argv)
           -pc_type fieldsplit -pc_fieldsplit_type schur -pc_fieldsplit_schur_factorization_type full -pc_fieldsplit_schur_precondition full \
             -fieldsplit_field_pc_type lu \
             -fieldsplit_potential_ksp_rtol 1e-10 -fieldsplit_potential_pc_type lu
+  test:
+    nsize: 4
+    suffix: 2d_bdm1_p0_bddc
+    requires: triangle !single
+    args: -sol_type linear \
+          -field_petscspace_degree 1 -field_petscdualspace_type bdm -dm_refine 1 \
+          -dmsnes_check .001 -snes_error_if_not_converged \
+          -ksp_error_if_not_converged -ksp_type cg \
+          -petscpartitioner_type simple -dm_mat_type is \
+          -pc_type bddc -pc_bddc_use_local_mat_graph 0 \
+          -pc_bddc_benign_trick -pc_bddc_nonetflux -pc_bddc_detect_disconnected -pc_bddc_use_qr_single \
+          -pc_bddc_coarse_redundant_pc_type svd -pc_bddc_neumann_pc_type svd -pc_bddc_dirichlet_pc_type svd
+
+  test:
+    nsize: 9
+    requires: !single
+    suffix: 2d_rt1_p0_bddc
+    args: -sol_type quadratic \
+          -potential_petscspace_degree 0 \
+          -potential_petscdualspace_lagrange_use_moments \
+          -potential_petscdualspace_lagrange_moment_order 2 \
+          -field_petscfe_default_quadrature_order 1 \
+          -field_petscspace_degree 1 \
+          -field_petscspace_type sum \
+          -field_petscspace_variables 2 \
+          -field_petscspace_components 2 \
+          -field_petscspace_sum_spaces 2 \
+          -field_petscspace_sum_concatenate true \
+          -field_sumcomp_0_petscspace_variables 2 \
+          -field_sumcomp_0_petscspace_type tensor \
+          -field_sumcomp_0_petscspace_tensor_spaces 2 \
+          -field_sumcomp_0_petscspace_tensor_uniform false \
+          -field_sumcomp_0_tensorcomp_0_petscspace_degree 1 \
+          -field_sumcomp_0_tensorcomp_1_petscspace_degree 0 \
+          -field_sumcomp_1_petscspace_variables 2 \
+          -field_sumcomp_1_petscspace_type tensor \
+          -field_sumcomp_1_petscspace_tensor_spaces 2 \
+          -field_sumcomp_1_petscspace_tensor_uniform false \
+          -field_sumcomp_1_tensorcomp_0_petscspace_degree 0 \
+          -field_sumcomp_1_tensorcomp_1_petscspace_degree 1 \
+          -field_petscdualspace_form_degree -1 \
+          -field_petscdualspace_order 1 \
+          -field_petscdualspace_lagrange_trimmed true \
+          -dm_plex_box_faces 3,3 dm_refine 1 -dm_plex_simplex 0 \
+          -dmsnes_check .001 -snes_error_if_not_converged \
+          -ksp_error_if_not_converged -ksp_type cg \
+          -petscpartitioner_type simple -dm_mat_type is \
+          -pc_type bddc -pc_bddc_use_local_mat_graph 0 \
+          -pc_bddc_benign_trick -pc_bddc_nonetflux -pc_bddc_detect_disconnected -pc_bddc_use_qr_single \
+          -pc_bddc_coarse_redundant_pc_type svd -pc_bddc_neumann_pc_type svd -pc_bddc_dirichlet_pc_type svd
+
   test:
     # Using -dm_refine 2 -convest_num_refine 3 we get L_2 convergence rate: [2.0, 1.0]
     # Using -sol_type quadratic -dm_refine 2 -convest_num_refine 3 we get L_2 convergence rate: [2.9, 1.0]

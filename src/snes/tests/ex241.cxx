@@ -74,10 +74,9 @@ PetscErrorCode UserFunction(SNES snes, Vec X, Vec F, void *ptr)
   AppCtx            *user = (AppCtx *)ptr;
   PetscInt           N, i;
   PetscScalar       *f;
-  PetscReal          half;
+  PetscReal          half = 0.5;
   const PetscScalar *x;
 
-  half = 0.5;
   PetscFunctionBeginUser;
   PetscCall(VecGetSize(X, &N));
   PetscCall(VecGetArrayRead(X, &x));
@@ -139,6 +138,6 @@ PetscErrorCode UserJacobian(SNES snes, Vec X, Mat J, Mat jac, void *ptr)
       requires: !single !defined(PETSC_HAVE_SUN_CXX) !complex
 
    test:
-      args:  -snes_monitor_solution -snes_linesearch_monitor
+      args: -snes_monitor_solution -snes_linesearch_monitor
 
 TEST*/

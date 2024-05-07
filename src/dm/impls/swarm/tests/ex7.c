@@ -1,9 +1,9 @@
 static char help[] = "Example program demonstrating projection between particle and finite element spaces using OpenMP in 2D cylindrical coordinates\n";
 
-#include "petscdmplex.h"
-#include "petscds.h"
-#include "petscdmswarm.h"
-#include "petscksp.h"
+#include <petscdmplex.h>
+#include <petscds.h>
+#include <petscdmswarm.h>
+#include <petscksp.h>
 #include <petsc/private/petscimpl.h>
 #if defined(PETSC_HAVE_OPENMP) && defined(PETSC_HAVE_THREADSAFETY)
   #include <omp.h>
@@ -196,9 +196,9 @@ PetscErrorCode particlesToGrid(const DM dm, DM sw, const PetscInt Np, const Pets
   if (a_tid == target) PetscCall(VecViewFromOptions(rho, NULL, "-rho_view"));
   // output
   *Mp_out = M_p;
-
   PetscFunctionReturn(PETSC_SUCCESS);
 }
+
 static PetscErrorCode maxwellian(PetscInt dim, const PetscReal x[], PetscReal kt_m, PetscReal n, PetscScalar *u)
 {
   PetscInt  i;

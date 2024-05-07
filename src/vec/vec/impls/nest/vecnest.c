@@ -513,7 +513,7 @@ static PetscErrorCode VecGetSubVector_Nest(Vec X, IS is, Vec *x)
     PetscCall(ISEqual(is, bx->is[i], &issame));
     if (issame) {
       *x = bx->v[i];
-      PetscCall(PetscObjectReference((PetscObject)(*x)));
+      PetscCall(PetscObjectReference((PetscObject)*x));
       break;
     }
   }
@@ -598,7 +598,7 @@ static PetscErrorCode VecRestoreArrayRead_Nest(Vec X, const PetscScalar **x)
 static PetscErrorCode VecConcatenate_Nest(PetscInt nx, const Vec X[], Vec *Y, IS *x_is[])
 {
   PetscFunctionBegin;
-  PetscCheck(nx <= 0, PetscObjectComm((PetscObject)(*X)), PETSC_ERR_SUP, "VecConcatenate() is not supported for VecNest");
+  PetscCheck(nx <= 0, PetscObjectComm((PetscObject)*X), PETSC_ERR_SUP, "VecConcatenate() is not supported for VecNest");
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
@@ -883,7 +883,7 @@ static PetscErrorCode VecNestGetSubVecs_Nest(Vec X, PetscInt *N, Vec **sx)
 
   Output Parameters:
 + N  - number of nested vecs
-- sx - array of vectors
+- sx - array of vectors, can pass in `NULL`
 
   Level: developer
 

@@ -54,12 +54,11 @@
 
       PetscCallA(VecCopy(x,y,ierr))
 
-      return
       end
 
 !/*TEST
 !
 !    test:
-!      args:  -ksp_monitor_short
+!      args: -ksp_monitor_short
 !
 !TEST*/

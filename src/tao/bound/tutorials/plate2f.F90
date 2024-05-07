@@ -392,7 +392,6 @@
 
       PetscCall(PetscLogFlops(70.0d0*xm*ym,ierr))
 
-      return
       end  !FormFunctionGradient
 
 ! ----------------------------------------------------------------------------
@@ -628,7 +627,6 @@
 
       PetscCall(PetscLogFlops(199.0d0*xm*ym,ierr))
 
-      return
       end
 
 ! Top,Left,Right,Bottom,bheight,mx,my,bmx,bmy,H, defined in plate2f.h
@@ -784,7 +782,6 @@
          PetscCall(VecScale(Left,scl,ierr))
       endif
 
-      return
       end
 
 ! ----------------------------------------------------------------------------
@@ -843,7 +840,6 @@
 
       PetscCall(VecRestoreArrayF90(xl,xl_v,ierr))
 
-      return
       end
 
 ! ----------------------------------------------------------------------------
@@ -927,7 +923,6 @@
 
       endif
 
-      return
       end
 
 !
@@ -937,7 +932,7 @@
 !      requires: !complex
 !
 !   test:
-!      args: -tao_smonitor -mx 8 -my 6 -bmx 3 -bmy 3 -bheight 0.2 -tao_type bqnls -tao_gatol 1.e-4
+!      args: -tao_monitor_short -mx 8 -my 6 -bmx 3 -bmy 3 -bheight 0.2 -tao_type bqnls -tao_gatol 1.e-4
 !      filter: sort -b
 !      filter_output: sort -b
 !      requires: !single
@@ -945,7 +940,7 @@
 !   test:
 !      suffix: 2
 !      nsize: 2
-!      args: -tao_smonitor -mx 8 -my 6 -bmx 3 -bmy 3 -bheight 0.2 -tao_type bqnls -tao_gatol 1.e-4
+!      args: -tao_monitor_short -mx 8 -my 6 -bmx 3 -bmy 3 -bheight 0.2 -tao_type bqnls -tao_gatol 1.e-4
 !      filter: sort -b
 !      filter_output: sort -b
 !      requires: !single

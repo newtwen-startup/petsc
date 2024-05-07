@@ -212,11 +212,12 @@ struct _MatOps {
   PetscErrorCode (*destroysubmatrices)(PetscInt, Mat *[]);
   PetscErrorCode (*mattransposesolve)(Mat, Mat, Mat);
   PetscErrorCode (*getvalueslocal)(Mat, PetscInt, const PetscInt[], PetscInt, const PetscInt[], PetscScalar[]);
-  PetscErrorCode (*creategraph)(Mat, PetscBool, PetscBool, PetscReal, Mat *);
+  PetscErrorCode (*creategraph)(Mat, PetscBool, PetscBool, PetscReal, PetscInt, PetscInt[], Mat *);
   PetscErrorCode (*dummy)(Mat);
   /*150*/
   PetscErrorCode (*transposesymbolic)(Mat, Mat *);
   PetscErrorCode (*eliminatezeros)(Mat, PetscBool);
+  PetscErrorCode (*getrowsumabs)(Mat, Vec);
 };
 /*
     If you add MatOps entries above also add them to the MATOP enum
@@ -252,6 +253,9 @@ PETSC_INTERN PetscErrorCode MatConvert_Dense_ScaLAPACK(Mat, MatType, MatReuse, M
 PETSC_INTERN PetscErrorCode MatSetPreallocationCOO_Basic(Mat, PetscCount, PetscInt[], PetscInt[]);
 PETSC_INTERN PetscErrorCode MatSetValuesCOO_Basic(Mat, const PetscScalar[], InsertMode);
 
+/* This can be moved to the public header after implementing some missing MatProducts */
+PETSC_INTERN PetscErrorCode MatCreateFromISLocalToGlobalMapping(ISLocalToGlobalMapping, Mat, PetscBool, PetscBool, MatType, Mat *);
+
 /* these callbacks rely on the old matrix function pointers for
    matmat operations. They are unsafe, and should be removed.
    However, the amount of work needed to clean up all the
@@ -273,7 +277,7 @@ PETSC_INTERN PetscErrorCode MatProductCreate_Private(Mat, Mat, Mat, Mat);
 PETSC_INTERN PetscErrorCode MatProductSymbolic_ABC_Basic(Mat);
 
 /* CreateGraph is common to AIJ seq and mpi */
-PETSC_INTERN PetscErrorCode MatCreateGraph_Simple_AIJ(Mat, PetscBool, PetscBool, PetscReal, Mat *);
+PETSC_INTERN PetscErrorCode MatCreateGraph_Simple_AIJ(Mat, PetscBool, PetscBool, PetscReal, PetscInt, PetscInt[], Mat *);
 
 #if defined(PETSC_CLANG_STATIC_ANALYZER)
 template <typename Tm>
@@ -440,6 +444,7 @@ typedef struct { /* used by MatProduct() */
   PetscBool      symbolic_used_the_fact_C_is_symmetric; /* MatMatMult(A,B,MAT_REUSE_MATRIX,..&C) is still legitimate), we need to redo symbolic! */
   PetscReal      fill;
   PetscBool      api_user; /* used to distinguish command line options and to indicate the matrix values are ready to be consumed at symbolic phase if needed */
+  PetscBool      setfromoptionscalled;
 
   /* Some products may display the information on the algorithm used */
   PetscErrorCode (*view)(Mat, PetscViewer);
@@ -566,6 +571,7 @@ struct _MatCoarsenOps {
   PetscErrorCode (*view)(MatCoarsen, PetscViewer);
 };
 
+#define MAT_COARSEN_STRENGTH_INDEX_SIZE 3
 struct _p_MatCoarsen {
   PETSCHEADER(struct _MatCoarsenOps);
   Mat   graph;
@@ -574,6 +580,10 @@ struct _p_MatCoarsen {
   PetscBool         strict_aggs;
   IS                perm;
   PetscCoarsenData *agg_lists;
+  PetscInt          max_it;    /* number of iterations in HEM */
+  PetscReal         threshold; /* HEM can filter interim graphs */
+  PetscInt          strength_index_size;
+  PetscInt          strength_index[MAT_COARSEN_STRENGTH_INDEX_SIZE];
 };
 
 PETSC_EXTERN PetscErrorCode MatCoarsenMISKSetDistance(MatCoarsen, PetscInt);
@@ -742,8 +752,9 @@ typedef struct {
 } MatParentState;
 
 PETSC_EXTERN PetscErrorCode MatFactorDumpMatrix(Mat);
-PETSC_INTERN PetscErrorCode MatShift_Basic(Mat, PetscScalar);
 PETSC_INTERN PetscErrorCode MatSetBlockSizes_Default(Mat, PetscInt, PetscInt);
+
+PETSC_SINGLE_LIBRARY_INTERN PetscErrorCode MatShift_Basic(Mat, PetscScalar);
 
 static inline PetscErrorCode MatPivotCheck_nz(PETSC_UNUSED Mat mat, const MatFactorInfo *info, FactorShiftCtx *sctx, PETSC_UNUSED PetscInt row)
 {
@@ -1611,6 +1622,29 @@ static inline PetscErrorCode PetscLLCondensedDestroy_fast(PetscInt *lnk)
   return PetscFree(lnk);
 }
 
+PETSC_EXTERN PetscErrorCode PetscCDCreate(PetscInt, PetscCoarsenData **);
+PETSC_EXTERN PetscErrorCode PetscCDDestroy(PetscCoarsenData *);
+PETSC_EXTERN PetscErrorCode PetscCDIntNdSetID(PetscCDIntNd *, PetscInt);
+PETSC_EXTERN PetscErrorCode PetscCDIntNdGetID(const PetscCDIntNd *, PetscInt *);
+PETSC_EXTERN PetscErrorCode PetscCDAppendID(PetscCoarsenData *, PetscInt, PetscInt);
+PETSC_EXTERN PetscErrorCode PetscCDMoveAppend(PetscCoarsenData *, PetscInt, PetscInt);
+PETSC_EXTERN PetscErrorCode PetscCDAppendNode(PetscCoarsenData *, PetscInt, PetscCDIntNd *);
+PETSC_EXTERN PetscErrorCode PetscCDRemoveNextNode(PetscCoarsenData *, PetscInt, PetscCDIntNd *);
+PETSC_EXTERN PetscErrorCode PetscCDCountAt(const PetscCoarsenData *, PetscInt, PetscInt *);
+PETSC_EXTERN PetscErrorCode PetscCDIsEmptyAt(const PetscCoarsenData *, PetscInt, PetscBool *);
+PETSC_EXTERN PetscErrorCode PetscCDSetChunkSize(PetscCoarsenData *, PetscInt);
+PETSC_EXTERN PetscErrorCode PetscCDPrint(const PetscCoarsenData *, PetscInt, MPI_Comm);
+PETSC_EXTERN PetscErrorCode PetscCDGetNonemptyIS(PetscCoarsenData *, IS *);
+PETSC_EXTERN PetscErrorCode PetscCDGetMat(PetscCoarsenData *, Mat *);
+PETSC_EXTERN PetscErrorCode PetscCDSetMat(PetscCoarsenData *, Mat);
+PETSC_EXTERN PetscErrorCode PetscCDClearMat(PetscCoarsenData *);
+PETSC_EXTERN PetscErrorCode PetscCDRemoveAllAt(PetscCoarsenData *, PetscInt);
+PETSC_EXTERN PetscErrorCode PetscCDCount(const PetscCoarsenData *, PetscInt *_sz);
+
+PETSC_EXTERN PetscErrorCode PetscCDGetHeadPos(const PetscCoarsenData *, PetscInt, PetscCDIntNd **);
+PETSC_EXTERN PetscErrorCode PetscCDGetNextPos(const PetscCoarsenData *, PetscInt, PetscCDIntNd **);
+PETSC_EXTERN PetscErrorCode PetscCDGetASMBlocks(const PetscCoarsenData *, const PetscInt, PetscInt *, IS **);
+
 /* this is extern because it is used in MatFDColoringUseDM() which is in the DM library */
 PETSC_EXTERN PetscErrorCode MatFDColoringApply_AIJ(Mat, MatFDColoring, Vec, void *);
 
@@ -1722,3 +1756,4 @@ PETSC_EXTERN PetscLogEvent MAT_H2Opus_Compress;
 PETSC_EXTERN PetscLogEvent MAT_H2Opus_Orthog;
 PETSC_EXTERN PetscLogEvent MAT_H2Opus_LR;
 PETSC_EXTERN PetscLogEvent MAT_CUDACopyToGPU;
+PETSC_EXTERN PetscLogEvent MAT_HIPCopyToGPU;

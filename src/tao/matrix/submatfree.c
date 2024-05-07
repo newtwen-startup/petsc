@@ -20,6 +20,9 @@
   Note:
   The caller is responsible for destroying the input objects after matrix J has been destroyed.
 
+  Developer Note:
+  This should be moved/supported in `Mat`
+
 .seealso: `MatCreate()`
 @*/
 PetscErrorCode MatCreateSubMatrixFree(Mat mat, IS Rows, IS Cols, Mat *J)
@@ -58,7 +61,6 @@ PetscErrorCode MatCreateSubMatrixFree(Mat mat, IS Rows, IS Cols, Mat *J)
   PetscCall(MatShellSetOperation(*J, MATOP_DUPLICATE, (void (*)(void))MatDuplicate_SMF));
   PetscCall(MatShellSetOperation(*J, MATOP_CREATE_SUBMATRIX, (void (*)(void))MatCreateSubMatrix_SMF));
   PetscCall(MatShellSetOperation(*J, MATOP_GET_ROW_MAX, (void (*)(void))MatDuplicate_SMF));
-
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 

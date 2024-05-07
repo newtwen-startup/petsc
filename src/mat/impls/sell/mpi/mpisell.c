@@ -174,15 +174,15 @@ static PetscErrorCode MatSetValues_MPISELL(Mat mat, PetscInt m, const PetscInt i
       row      = im[i] - rstart;
       lastcol1 = -1;
       shift1   = a->sliidx[row / sliceheight] + (row % sliceheight); /* starting index of the row */
-      cp1      = a->colidx + shift1;
-      vp1      = a->val + shift1;
+      cp1      = PetscSafePointerPlusOffset(a->colidx, shift1);
+      vp1      = PetscSafePointerPlusOffset(a->val, shift1);
       nrow1    = a->rlen[row];
       low1     = 0;
       high1    = nrow1;
       lastcol2 = -1;
       shift2   = b->sliidx[row / sliceheight] + (row % sliceheight); /* starting index of the row */
-      cp2      = b->colidx + shift2;
-      vp2      = b->val + shift2;
+      cp2      = PetscSafePointerPlusOffset(b->colidx, shift2);
+      vp2      = PetscSafePointerPlusOffset(b->val, shift2);
       nrow2    = b->rlen[row];
       low2     = 0;
       high2    = nrow2;
@@ -209,7 +209,7 @@ static PetscErrorCode MatSetValues_MPISELL(Mat mat, PetscInt m, const PetscInt i
 #else
             col = sell->colmap[in[j]] - 1;
 #endif
-            if (col < 0 && !((Mat_SeqSELL *)(sell->B->data))->nonew) {
+            if (col < 0 && !((Mat_SeqSELL *)sell->B->data)->nonew) {
               PetscCall(MatDisAssemble_MPISELL(mat));
               col = in[j];
               /* Reinitialize the variables required by MatSetValues_SeqSELL_B_Private() */
@@ -346,7 +346,7 @@ PetscErrorCode MatAssemblyEnd_MPISELL(Mat mat, MatAssemblyType mode)
   PetscCall(VecDestroy(&sell->diag));
 
   /* if no new nonzero locations are allowed in matrix then only set the matrix state the first time through */
-  if ((!mat->was_assembled && mode == MAT_FINAL_ASSEMBLY) || !((Mat_SeqSELL *)(sell->A->data))->nonew) {
+  if ((!mat->was_assembled && mode == MAT_FINAL_ASSEMBLY) || !((Mat_SeqSELL *)sell->A->data)->nonew) {
     PetscObjectState state = sell->A->nonzerostate + sell->B->nonzerostate;
     PetscCall(MPIU_Allreduce(&state, &mat->nonzerostate, 1, MPIU_INT64, MPI_SUM, PetscObjectComm((PetscObject)mat)));
   }
@@ -660,11 +660,10 @@ static PetscErrorCode MatView_MPISELL_ASCIIorDraworSocket(Mat mat, PetscViewer v
     */
     PetscCall(PetscViewerGetSubViewer(viewer, PETSC_COMM_SELF, &sviewer));
     if (rank == 0) {
-      PetscCall(PetscObjectSetName((PetscObject)((Mat_MPISELL *)(A->data))->A, ((PetscObject)mat)->name));
-      PetscCall(MatView_SeqSELL(((Mat_MPISELL *)(A->data))->A, sviewer));
+      PetscCall(PetscObjectSetName((PetscObject)((Mat_MPISELL *)A->data)->A, ((PetscObject)mat)->name));
+      PetscCall(MatView_SeqSELL(((Mat_MPISELL *)A->data)->A, sviewer));
     }
     PetscCall(PetscViewerRestoreSubViewer(viewer, PETSC_COMM_SELF, &sviewer));
-    PetscCall(PetscViewerFlush(viewer));
     PetscCall(MatDestroy(&A));
   }
   PetscFunctionReturn(PETSC_SUCCESS);
@@ -1249,6 +1248,7 @@ static const struct _MatOps MatOps_Values = {MatSetValues_MPISELL,
                                              NULL,
                                              NULL,
                                              /*150*/ NULL,
+                                             NULL,
                                              NULL};
 
 /*@C
@@ -1404,26 +1404,26 @@ M*/
   Input Parameters:
 + comm      - MPI communicator
 . m         - number of local rows (or `PETSC_DECIDE` to have calculated if M is given)
-           This value should be the same as the local size used in creating the
-           y vector for the matrix-vector product y = Ax.
+              This value should be the same as the local size used in creating the
+              y vector for the matrix-vector product y = Ax.
 . n         - This value should be the same as the local size used in creating the
-       x vector for the matrix-vector product y = Ax. (or `PETSC_DECIDE` to have
-       calculated if `N` is given) For square matrices n is almost always `m`.
+              x vector for the matrix-vector product y = Ax. (or `PETSC_DECIDE` to have
+              calculated if `N` is given) For square matrices n is almost always `m`.
 . M         - number of global rows (or `PETSC_DETERMINE` to have calculated if `m` is given)
 . N         - number of global columns (or `PETSC_DETERMINE` to have calculated if `n` is given)
 . d_rlenmax - max number of nonzeros per row in DIAGONAL portion of local submatrix
-               (same value is used for all local rows)
+             (same value is used for all local rows)
 . d_rlen    - array containing the number of nonzeros in the various rows of the
-            DIAGONAL portion of the local submatrix (possibly different for each row)
-            or `NULL`, if d_rlenmax is used to specify the nonzero structure.
-            The size of this array is equal to the number of local rows, i.e `m`.
+              DIAGONAL portion of the local submatrix (possibly different for each row)
+              or `NULL`, if d_rlenmax is used to specify the nonzero structure.
+              The size of this array is equal to the number of local rows, i.e `m`.
 . o_rlenmax - max number of nonzeros per row in the OFF-DIAGONAL portion of local
-               submatrix (same value is used for all local rows).
+              submatrix (same value is used for all local rows).
 - o_rlen    - array containing the number of nonzeros in the various rows of the
-            OFF-DIAGONAL portion of the local submatrix (possibly different for
-            each row) or `NULL`, if `o_rlenmax` is used to specify the nonzero
-            structure. The size of this array is equal to the number
-            of local rows, i.e `m`.
+              OFF-DIAGONAL portion of the local submatrix (possibly different for
+              each row) or `NULL`, if `o_rlenmax` is used to specify the nonzero
+              structure. The size of this array is equal to the number
+              of local rows, i.e `m`.
 
   Output Parameter:
 . A - the matrix

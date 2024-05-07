@@ -54,13 +54,28 @@
       PetscEnum, parameter :: DM_POLYTOPE_FV_GHOST = 12
       PetscEnum, parameter :: DM_POLYTOPE_INTERIOR_GHOST = 13
       PetscEnum, parameter :: DM_POLYTOPE_UNKNOWN = 14
-      PetscEnum, parameter :: DM_NUM_POLYTOPES = 15
+      PetscEnum, parameter :: DM_POLYTOPE_UNKNOWN_CELL = 15
+      PetscEnum, parameter :: DM_POLYTOPE_UNKNOWN_FACE = 16
+      PetscEnum, parameter :: DM_NUM_POLYTOPES = 17
 !
 ! DMCopyLabelsMode
 !
       PetscEnum, parameter :: DM_COPY_LABELS_REPLACE = 0
       PetscEnum, parameter :: DM_COPY_LABELS_KEEP    = 1
       PetscEnum, parameter :: DM_COPY_LABELS_FAIL    = 2
+!
+! DMReorderDefaultFlag
+!
+      PetscEnum, parameter :: DM_REORDER_DEFAULT_NOTSET = -1
+      PetscEnum, parameter :: DM_REORDER_DEFAULT_FALSE = 0
+      PetscEnum, parameter :: DM_REORDER_DEFAULT_TRUE = 1
+!
+!  PetscDTNodeType
+!
+      PetscEnum, parameter :: PETSCDTNODES_DEFAULT     = -1
+      PetscEnum, parameter :: PETSCDTNODES_GAUSSJACOBI = 0
+      PetscEnum, parameter :: PETSCDTNODES_EQUISPACED  = 1
+      PetscEnum, parameter :: PETSCDTNODES_TANHSINH    = 2
 
 #if defined(_WIN32) && defined(PETSC_USE_SHARED_LIBRARIES)
 !DEC$ ATTRIBUTES DLLEXPORT::PETSC_NULL_DM

@@ -133,12 +133,12 @@ PetscErrorCode KSPGuessDestroy(KSPGuess *guess)
 {
   PetscFunctionBegin;
   if (!*guess) PetscFunctionReturn(PETSC_SUCCESS);
-  PetscValidHeaderSpecific((*guess), KSPGUESS_CLASSID, 1);
-  if (--((PetscObject)(*guess))->refct > 0) {
+  PetscValidHeaderSpecific(*guess, KSPGUESS_CLASSID, 1);
+  if (--((PetscObject)*guess)->refct > 0) {
     *guess = NULL;
     PetscFunctionReturn(PETSC_SUCCESS);
   }
-  PetscTryTypeMethod((*guess), destroy);
+  PetscTryTypeMethod(*guess, destroy);
   PetscCall(MatDestroy(&(*guess)->A));
   PetscCall(PetscHeaderDestroy(guess));
   PetscFunctionReturn(PETSC_SUCCESS);
@@ -318,7 +318,7 @@ PetscErrorCode KSPGuessUpdate(KSPGuess guess, Vec rhs, Vec sol)
 
   Input Parameters:
 + guess - the initial guess context
-. rhs   - the current right hand side vector
+. rhs   - the current right-hand side vector
 - sol   - the initial guess vector
 
   Level: developer

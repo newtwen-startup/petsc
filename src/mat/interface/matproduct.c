@@ -331,6 +331,7 @@ static PetscErrorCode MatProductNumeric_X_Dense(Mat C)
     PetscCall(MatDenseRestoreColumnVecRead(B, k, &x));
     PetscCall(MatDenseRestoreColumnVecWrite(C, k, &y));
   }
+  PetscCall(MatSetOption(C, MAT_NO_OFF_PROC_ENTRIES, PETSC_TRUE));
   PetscCall(MatAssemblyBegin(C, MAT_FINAL_ASSEMBLY));
   PetscCall(MatAssemblyEnd(C, MAT_FINAL_ASSEMBLY));
   if (PetscDefined(HAVE_CUDA)) {
@@ -533,7 +534,8 @@ PetscErrorCode MatProductSetFromOptions(Mat mat)
   PetscFunctionBegin;
   PetscValidHeaderSpecific(mat, MAT_CLASSID, 1);
   MatCheckProduct(mat, 1);
-  PetscCheck(!mat->product->data, PetscObjectComm((PetscObject)mat), PETSC_ERR_ORDER, "Cannot call MatProductSetFromOptions with already present data");
+  PetscCheck(!mat->product->data, PetscObjectComm((PetscObject)mat), PETSC_ERR_ORDER, "Cannot call MatProductSetFromOptions() with already present data");
+  mat->product->setfromoptionscalled = PETSC_TRUE;
   PetscObjectOptionsBegin((PetscObject)mat);
   PetscCall(PetscOptionsBool("-mat_product_clear", "Clear intermediate data structures after MatProductNumeric() has been called", "MatProductClear", mat->product->clear, &mat->product->clear, NULL));
   PetscCall(PetscOptionsDeprecated("-mat_freeintermediatedatastructures", "-mat_product_clear", "3.13", "Or call MatProductClear() after MatProductNumeric()"));
@@ -804,7 +806,8 @@ PetscErrorCode MatProductSymbolic(Mat mat)
     } else {
       PetscCall(PetscSNPrintf(errstr, 256, "%s with A %s, B %s", MatProductTypes[mat->product->type], ((PetscObject)mat->product->A)->type_name, ((PetscObject)mat->product->B)->type_name));
     }
-    PetscCheck(!missing, PetscObjectComm((PetscObject)mat), PETSC_ERR_PLIB, "Unspecified symbolic phase for product %s. Call MatProductSetFromOptions() first", errstr);
+    PetscCheck(mat->product->setfromoptionscalled, PetscObjectComm((PetscObject)mat), PETSC_ERR_PLIB, "Unspecified symbolic phase for product %s. Call MatProductSetFromOptions() first", errstr);
+    PetscCheck(!missing, PetscObjectComm((PetscObject)mat), PETSC_ERR_SUP, "Unspecified symbolic phase for product %s. The product is not supported", errstr);
     PetscCheck(mat->product, PetscObjectComm((PetscObject)mat), PETSC_ERR_PLIB, "Missing struct after symbolic phase for product %s", errstr);
   }
 
@@ -861,7 +864,7 @@ PetscErrorCode MatProductSetFill(Mat mat, PetscReal fill)
 
   Level: intermediate
 
-.seealso: [](ch_matrices), `MatProduct`, `Mat`, `MatProductClear()`, `MatProductSetType()`, `MatProductSetFill()`, `MatProductCreate()`, `MatProductAlgorithm`, `MatProductType`
+.seealso: [](ch_matrices), `MatProduct`, `Mat`, `MatProductClear()`, `MatProductSetType()`, `MatProductSetFill()`, `MatProductCreate()`, `MatProductAlgorithm`, `MatProductType`, `MatProductGetAlgorithm()`
 @*/
 PetscErrorCode MatProductSetAlgorithm(Mat mat, MatProductAlgorithm alg)
 {
@@ -870,6 +873,31 @@ PetscErrorCode MatProductSetAlgorithm(Mat mat, MatProductAlgorithm alg)
   MatCheckProduct(mat, 1);
   PetscCall(PetscFree(mat->product->alg));
   PetscCall(PetscStrallocpy(alg, &mat->product->alg));
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
+/*@C
+  MatProductGetAlgorithm - Returns the selected algorithm for a matrix-matrix product operation
+
+  Not Collective
+
+  Input Parameter:
+. mat - the matrix whose values are computed via a matrix-matrix product operation
+
+  Output Parameter:
+. alg - the selected algorithm of the matrix product, e.g., `MATPRODUCTALGORITHMDEFAULT`.
+
+  Level: intermediate
+
+.seealso: [](ch_matrices), `MatProduct`, `Mat`, `MatProductSetAlgorithm()`
+@*/
+PetscErrorCode MatProductGetAlgorithm(Mat mat, MatProductAlgorithm *alg)
+{
+  PetscFunctionBegin;
+  PetscValidHeaderSpecific(mat, MAT_CLASSID, 1);
+  PetscAssertPointer(alg, 2);
+  if (mat->product) *alg = mat->product->alg;
+  else *alg = NULL;
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
@@ -957,14 +985,15 @@ PetscErrorCode MatProductCreate_Private(Mat A, Mat B, Mat C, Mat D)
   PetscValidHeaderSpecific(D, MAT_CLASSID, 4);
   PetscCheck(!D->product, PetscObjectComm((PetscObject)D), PETSC_ERR_PLIB, "Product already present");
   PetscCall(PetscNew(&product));
-  product->A        = A;
-  product->B        = B;
-  product->C        = C;
-  product->type     = MATPRODUCT_UNSPECIFIED;
-  product->Dwork    = NULL;
-  product->api_user = PETSC_FALSE;
-  product->clear    = PETSC_FALSE;
-  D->product        = product;
+  product->A                    = A;
+  product->B                    = B;
+  product->C                    = C;
+  product->type                 = MATPRODUCT_UNSPECIFIED;
+  product->Dwork                = NULL;
+  product->api_user             = PETSC_FALSE;
+  product->clear                = PETSC_FALSE;
+  product->setfromoptionscalled = PETSC_FALSE;
+  D->product                    = product;
 
   PetscCall(MatProductSetAlgorithm(D, MATPRODUCTALGORITHMDEFAULT));
   PetscCall(MatProductSetFill(D, PETSC_DEFAULT));

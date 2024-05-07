@@ -615,34 +615,38 @@ PetscErrorCode HessianProduct(void *ptr, Vec svec, Vec y)
 
    test:
       suffix: 1
-      args: -tao_smonitor -tao_type ntl -tao_gatol 1.e-4
+      args: -tao_monitor_short -tao_type ntl -tao_gatol 1.e-4
 
    test:
       suffix: 2
-      args: -tao_smonitor -tao_type ntr -tao_gatol 1.e-4
+      args: -tao_monitor_short -tao_type ntr -tao_gatol 1.e-4
 
    test:
       suffix: 3
-      args: -tao_smonitor -tao_type bntr -tao_gatol 1.e-4 -my_tao_mf -tao_test_hessian
+      args: -tao_monitor_short -tao_type bntr -tao_gatol 1.e-4 -my_tao_mf -tao_test_hessian
 
    test:
      suffix: 4
-     args: -tao_smonitor -tao_gatol 1e-3 -tao_type bqnls
+     args: -tao_monitor_short -tao_gatol 1e-3 -tao_type bqnls
 
    test:
      suffix: 5
-     args: -tao_smonitor -tao_gatol 1e-3 -tao_type blmvm
+     args: -tao_monitor_short -tao_gatol 1e-3 -tao_type blmvm
 
    test:
      suffix: 6
-     args: -tao_smonitor -tao_gatol 1e-3 -tao_type bqnktr -tao_bqnk_mat_type lmvmsr1
+     args: -tao_monitor_short -tao_gatol 1e-3 -tao_type bqnktr -tao_bqnk_mat_type lmvmsr1
 
    test:
      suffix: snes
-     args: -snes_monitor ::ascii_info_detail -tao_type snes -snes_type newtontr -ksp_type cg  -snes_atol 1.e-4 -tao_mf_hessian {{0 1}} -pc_type none
+     args: -snes_monitor ::ascii_info_detail -tao_type snes -snes_type newtontr -ksp_type cg -snes_atol 1.e-4 -tao_mf_hessian {{0 1}} -pc_type none
 
    test:
      suffix: snes_2
      args: -snes_monitor ::ascii_info_detail -tao_type snes -snes_type newtontr -snes_atol 5.e-4 -tao_mf_hessian -pc_type none -snes_tr_fallback_type cauchy
+
+   test:
+     suffix: snes_3
+     args: -snes_monitor ::ascii_info_detail -tao_type snes -snes_type newtontr -snes_atol 5.e-4 -tao_mf_hessian -pc_type lmvm -snes_tr_fallback_type cauchy
 
 TEST*/

@@ -332,7 +332,7 @@ static inline PETSC_UNUSED PetscErrorCode PetscLogEventSync(PetscLogEvent e, MPI
     for (int i = 0; i < PETSC_LOG_HANDLER_MAX; i++) {
       PetscLogHandlerHot *h = &PetscLogHandlers[i];
       if (h->eventSync) {
-        PetscErrorCode err = (*(h->eventSync))(h->handler, e, comm);
+        PetscErrorCode err = (*h->eventSync)(h->handler, e, comm);
         if (err != PETSC_SUCCESS) return err;
       }
     }
@@ -346,7 +346,7 @@ static inline PETSC_UNUSED PetscErrorCode PetscLogEventBegin_Internal(PetscLogEv
     for (int i = 0; i < PETSC_LOG_HANDLER_MAX; i++) {
       PetscLogHandlerHot *h = &PetscLogHandlers[i];
       if (h->eventBegin) {
-        PetscErrorCode err = (*(h->eventBegin))(h->handler, e, o1, o2, o3, o4);
+        PetscErrorCode err = (*h->eventBegin)(h->handler, e, o1, o2, o3, o4);
         if (err != PETSC_SUCCESS) return err;
       }
     }
@@ -361,7 +361,7 @@ static inline PETSC_UNUSED PetscErrorCode PetscLogEventEnd_Internal(PetscLogEven
     for (int i = 0; i < PETSC_LOG_HANDLER_MAX; i++) {
       PetscLogHandlerHot *h = &PetscLogHandlers[i];
       if (h->eventEnd) {
-        PetscErrorCode err = (*(h->eventEnd))(h->handler, e, o1, o2, o3, o4);
+        PetscErrorCode err = (*h->eventEnd)(h->handler, e, o1, o2, o3, o4);
         if (err != PETSC_SUCCESS) return err;
       }
     }
@@ -377,7 +377,7 @@ static inline PETSC_UNUSED PetscErrorCode PetscLogObjectCreate(PetscObject o)
     for (int i = 0; i < PETSC_LOG_HANDLER_MAX; i++) {
       PetscLogHandlerHot *h = &PetscLogHandlers[i];
       if (h->objectCreate) {
-        PetscErrorCode err = (*(h->objectCreate))(h->handler, o);
+        PetscErrorCode err = (*h->objectCreate)(h->handler, o);
         if (err != PETSC_SUCCESS) return err;
       }
     }
@@ -391,7 +391,7 @@ static inline PETSC_UNUSED PetscErrorCode PetscLogObjectDestroy(PetscObject o)
     for (int i = 0; i < PETSC_LOG_HANDLER_MAX; i++) {
       PetscLogHandlerHot *h = &PetscLogHandlers[i];
       if (h->objectDestroy) {
-        PetscErrorCode err = (*(h->objectDestroy))(h->handler, o);
+        PetscErrorCode err = (*h->objectDestroy)(h->handler, o);
         if (err != PETSC_SUCCESS) return err;
       }
     }
@@ -504,7 +504,7 @@ static inline int PetscMPIParallelComm(MPI_Comm comm)
     #define MPI_Startall_isend(count, datatype, number, requests) \
       (PetscAddLogDouble(&petsc_isend_ct, &petsc_isend_ct_th, number) || PetscMPITypeSize((count), (datatype), &(petsc_isend_len), &(petsc_isend_len_th)) || ((number) && MPI_Startall((number), (requests))))
 
-    #define MPI_Start_isend(count, datatype, requests) (PetscAddLogDouble(&petsc_isend_ct, &petsc_isend_ct_th, 1) || PetscMPITypeSize((count), (datatype), (&petsc_isend_len), (&petsc_isend_len_th)) || MPI_Start((requests)))
+    #define MPI_Start_isend(count, datatype, requests) (PetscAddLogDouble(&petsc_isend_ct, &petsc_isend_ct_th, 1) || PetscMPITypeSize((count), (datatype), (&petsc_isend_len), (&petsc_isend_len_th)) || MPI_Start(requests))
 
     #define MPI_Recv(buf, count, datatype, source, tag, comm, status) \
       (PetscAddLogDouble(&petsc_recv_ct, &petsc_recv_ct_th, 1) || PetscMPITypeSize((count), (datatype), (&petsc_recv_len), (&petsc_recv_len_th)) || MPI_Recv((buf), (count), (datatype), (source), (tag), (comm), (status)))
@@ -605,7 +605,7 @@ static inline int PetscMPIParallelComm(MPI_Comm comm)
 
     #define MPI_Startall_isend(count, datatype, number, requests) ((number) && MPI_Startall((number), (requests)))
 
-    #define MPI_Start_isend(count, datatype, requests) (MPI_Start((requests)))
+    #define MPI_Start_isend(count, datatype, requests) (MPI_Start(requests))
 
   #endif /* !MPIUNI_H && ! PETSC_HAVE_BROKEN_RECURSIVE_MACRO */
 

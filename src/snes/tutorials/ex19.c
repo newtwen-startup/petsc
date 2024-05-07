@@ -755,7 +755,7 @@ PetscErrorCode NonlinearGS(SNES snes, Vec X, Vec B, void *ctx)
    test:
       suffix: aspin
       nsize: 4
-      args: -da_refine 3 -da_overlap 2 -snes_monitor_short -snes_type aspin -grashof 4e4 -lidvelocity 100 -ksp_monitor_short
+      args: -da_refine 3 -da_overlap 2 -snes_monitor_short -snes_type aspin -grashof 4e4 -lidvelocity 100 -ksp_monitor_short -npc_sub_ksp_type preonly -npc_sub_pc_type lu
       requires: !single
 
    test:
@@ -1131,13 +1131,13 @@ PetscErrorCode NonlinearGS(SNES snes, Vec X, Vec B, void *ctx)
       suffix: cuda_1
       nsize: 1
       requires: cuda
-      args: -snes_monitor -dm_mat_type seqaijcusparse -dm_vec_type seqcuda -pc_type gamg -pc_gamg_esteig_ksp_max_it 10 -ksp_monitor -mg_levels_ksp_max_it 3 -pc_gamg_mis_k_minimum_degree_ordering true
+      args: -snes_monitor -dm_mat_type seqaijcusparse -dm_vec_type seqcuda -pc_type gamg -ksp_monitor -mg_levels_ksp_max_it 1
 
    test:
       suffix: cuda_2
       nsize: 3
       requires: cuda !single
-      args: -snes_monitor -dm_mat_type mpiaijcusparse -dm_vec_type mpicuda -pc_type gamg -pc_gamg_esteig_ksp_max_it 10 -ksp_monitor  -mg_levels_ksp_max_it 3 -pc_gamg_mis_k_minimum_degree_ordering true
+      args: -snes_monitor -dm_mat_type mpiaijcusparse -dm_vec_type mpicuda -pc_type gamg -ksp_monitor -mg_levels_ksp_max_it 1
 
    test:
       suffix: cuda_dm_bind_below
@@ -1150,13 +1150,13 @@ PetscErrorCode NonlinearGS(SNES snes, Vec X, Vec B, void *ctx)
       suffix: hip_1
       nsize: 1
       requires: hip
-      args: -snes_monitor -dm_mat_type mpiaijhipsparse -dm_vec_type hip -pc_type gamg -pc_gamg_esteig_ksp_max_it 10 -ksp_monitor -mg_levels_ksp_max_it 3
+      args: -snes_monitor -dm_mat_type mpiaijhipsparse -dm_vec_type hip -pc_type gamg -ksp_monitor -mg_levels_ksp_max_it 1
 
    test:
       suffix: hip_2
       nsize: 3
       requires: hip !single
-      args: -snes_monitor -dm_mat_type mpiaijhipsparse -dm_vec_type mpihip -pc_type gamg -pc_gamg_esteig_ksp_max_it 10 -ksp_monitor  -mg_levels_ksp_max_it 3
+      args: -snes_monitor -dm_mat_type mpiaijhipsparse -dm_vec_type mpihip -pc_type gamg -ksp_monitor -mg_levels_ksp_max_it 1
 
    test:
       suffix: hip_dm_bind_below
@@ -1181,7 +1181,7 @@ PetscErrorCode NonlinearGS(SNES snes, Vec X, Vec B, void *ctx)
    test:
       suffix: mpibaijmkl
       nsize: 2
-      requires:  defined(PETSC_HAVE_MKL_SPARSE_OPTIMIZE)
+      requires: defined(PETSC_HAVE_MKL_SPARSE_OPTIMIZE)
       args: -dm_mat_type baij -snes_monitor -ksp_monitor -snes_view
 
    test:
@@ -1194,11 +1194,12 @@ PetscErrorCode NonlinearGS(SNES snes, Vec X, Vec B, void *ctx)
      suffix: logviewmemory
      requires: defined(PETSC_USE_LOG) !defined(PETSC_HAVE_THREADSAFETY)
      args: -log_view -log_view_memory -da_refine 4
-     filter: grep MatFDColorSetUp | wc -w | xargs  -I % sh -c "expr % \> 21"
+     filter: grep MatFDColorSetUp | wc -w | xargs -I % sh -c "expr % \> 21"
 
    test:
      suffix: fs
-     args: -pc_type fieldsplit -da_refine 3  -all_ksp_monitor -fieldsplit_y_velocity_pc_type lu  -fieldsplit_temperature_pc_type lu -fieldsplit_x_velocity_pc_type lu  -snes_view
+     requires: !single
+     args: -pc_type fieldsplit -da_refine 3 -all_ksp_monitor -fieldsplit_y_velocity_pc_type lu -fieldsplit_temperature_pc_type lu -fieldsplit_x_velocity_pc_type lu -snes_view
 
    test:
      suffix: asm_matconvert

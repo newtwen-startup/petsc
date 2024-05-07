@@ -12,7 +12,6 @@
       PetscErrorCode ierr
 
       print*, 'Called MatMult'
-      return
       end
 
       subroutine mymatmultadd(A, x, y, z, ierr)
@@ -23,7 +22,6 @@
       PetscErrorCode ierr
 
       print*, 'Called MatMultAdd'
-      return
       end
 
       subroutine mymatmulttranspose(A, x, y, ierr)
@@ -34,7 +32,16 @@
       PetscErrorCode ierr
 
       print*, 'Called MatMultTranspose'
-      return
+      end
+
+      subroutine mymatmulthermitiantranspose(A, x, y, ierr)
+      use petscmat
+      implicit none
+      Mat A
+      Vec x, y
+      PetscErrorCode ierr
+
+      print*, 'Called MatMultHermitianTranspose'
       end
 
       subroutine mymatmulttransposeadd(A, x, y, z, ierr)
@@ -45,7 +52,16 @@
       PetscErrorCode ierr
 
       print*, 'Called MatMultTransposeAdd'
-      return
+      end
+
+      subroutine mymatmulthermitiantransposeadd(A, x, y, z, ierr)
+      use petscmat
+      implicit none
+      Mat A
+      Vec x, y, z
+      PetscErrorCode ierr
+
+      print*, 'Called MatMultHermitianTransposeAdd'
       end
 
       subroutine mymattranspose(A, reuse, B, ierr)
@@ -63,7 +79,6 @@
       PetscCallA(MatAssemblyEnd(B, MAT_FINAL_ASSEMBLY, ierr))
 
       print*, 'Called MatTranspose'
-      return
       end
 
       subroutine mymatgetdiagonal(A, x, ierr)
@@ -74,7 +89,6 @@
       PetscErrorCode ierr
 
       print*, 'Called MatGetDiagonal'
-      return
       end
 
       subroutine mymatdiagonalscale(A, x, y, ierr)
@@ -85,7 +99,6 @@
       PetscErrorCode ierr
 
       print*, 'Called MatDiagonalScale'
-      return
       end
 
       subroutine mymatzeroentries(A, ierr)
@@ -95,7 +108,6 @@
       PetscErrorCode ierr
 
       print*, 'Called MatZeroEntries'
-      return
       end
 
       subroutine mymataxpy(A, alpha, B, str, ierr)
@@ -107,7 +119,6 @@
       PetscErrorCode ierr
 
       print*, 'Called MatAXPY'
-      return
       end
 
       subroutine mymatshift(A, alpha, ierr)
@@ -118,7 +129,6 @@
       PetscErrorCode ierr
 
       print*, 'Called MatShift'
-      return
       end
 
       subroutine mymatdiagonalset(A, x, ins, ierr)
@@ -130,7 +140,6 @@
       PetscErrorCode ierr
 
       print*, 'Called MatDiagonalSet'
-      return
       end
 
       subroutine mymatdestroy(A, ierr)
@@ -140,7 +149,6 @@
       PetscErrorCode ierr
 
       print*, 'Called MatDestroy'
-      return
       end
 
       subroutine mymatview(A, viewer, ierr)
@@ -151,7 +159,6 @@
       PetscErrorCode ierr
 
       print*, 'Called MatView'
-      return
       end
 
       subroutine mymatgetvecs(A, x, y, ierr)
@@ -162,7 +169,6 @@
       PetscErrorCode ierr
 
       print*, 'Called MatCreateVecs'
-      return
       end
 
       program main
@@ -179,7 +185,9 @@
       external mymatmult
       external mymatmultadd
       external mymatmulttranspose
+      external mymatmulthermitiantranspose
       external mymatmulttransposeadd
+      external mymatmulthermitiantransposeadd
       external mymattranspose
       external mymatgetdiagonal
       external mymatdiagonalscale
@@ -210,8 +218,12 @@
       PetscCallA(MatShellSetOperation(m, op, mymatmultadd, ierr))
       op = MATOP_MULT_TRANSPOSE
       PetscCallA(MatShellSetOperation(m, op, mymatmulttranspose, ierr))
+      op = MATOP_MULT_HERMITIAN_TRANSPOSE
+      PetscCallA(MatShellSetOperation(m, op, mymatmulthermitiantranspose, ierr))
       op = MATOP_MULT_TRANSPOSE_ADD
       PetscCallA(MatShellSetOperation(m, op, mymatmulttransposeadd, ierr))
+      op = MATOP_MULT_HERMITIAN_TRANS_ADD
+      PetscCallA(MatShellSetOperation(m, op, mymatmulthermitiantransposeadd, ierr))
       op = MATOP_TRANSPOSE
       PetscCallA(MatShellSetOperation(m, op, mymattranspose, ierr))
       op = MATOP_GET_DIAGONAL
@@ -236,7 +248,9 @@
       PetscCallA(MatMult(m, x, y, ierr))
       PetscCallA(MatMultAdd(m, x, y, z, ierr))
       PetscCallA(MatMultTranspose(m, x, y, ierr))
+      PetscCallA(MatMultHermitianTranspose(m, x, y, ierr))
       PetscCallA(MatMultTransposeAdd(m, x, y, z, ierr))
+      PetscCallA(MatMultHermitianTransposeAdd(m, x, y, z, ierr))
       PetscCallA(MatTranspose(m, MAT_INITIAL_MATRIX, mt, ierr))
       PetscCallA(MatGetDiagonal(m, x, ierr))
       PetscCallA(MatDiagonalScale(m, x, y, ierr))
@@ -258,9 +272,15 @@
 
 !/*TEST
 !
-!   test:
+!   testset:
 !     args: -malloc_dump
 !     filter: sort -b
 !     filter_output: sort -b
+!     test:
+!       suffix: 1
+!       requires: !complex
+!     test:
+!       suffix: 2
+!       requires: complex
 !
 !TEST*/

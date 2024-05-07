@@ -20,7 +20,7 @@ typedef struct {
 } AppCtx;
 
 /* Event check */
-PetscErrorCode EventFunction(TS ts, PetscReal t, Vec X, PetscScalar *fvalue, void *ctx)
+PetscErrorCode EventFunction(TS ts, PetscReal t, Vec X, PetscReal *fvalue, void *ctx)
 {
   AppCtx *user = (AppCtx *)ctx;
 
@@ -29,7 +29,6 @@ PetscErrorCode EventFunction(TS ts, PetscReal t, Vec X, PetscScalar *fvalue, voi
   fvalue[0] = t - user->tf;
   /* Event for fault-off time */
   fvalue[1] = t - user->tcl;
-
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 

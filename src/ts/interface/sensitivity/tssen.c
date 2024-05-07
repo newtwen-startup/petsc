@@ -23,9 +23,9 @@ PetscLogEvent TS_AdjointStep, TS_ForwardStep, TS_JacobianPEval;
   Note:
   `Amat` has the same number of rows and the same row parallel layout as `u`, `Amat` has the same number of columns and parallel layout as `p`
 
-.seealso: [](ch_ts), `TS`, `TSRHSJacobianP`, `TSGetRHSJacobianP()`
+.seealso: [](ch_ts), `TS`, `TSRHSJacobianPFn`, `TSGetRHSJacobianP()`
 @*/
-PetscErrorCode TSSetRHSJacobianP(TS ts, Mat Amat, TSRHSJacobianP func, void *ctx)
+PetscErrorCode TSSetRHSJacobianP(TS ts, Mat Amat, TSRHSJacobianPFn *func, void *ctx)
 {
   PetscFunctionBegin;
   PetscValidHeaderSpecific(ts, TS_CLASSID, 1);
@@ -59,9 +59,9 @@ PetscErrorCode TSSetRHSJacobianP(TS ts, Mat Amat, TSRHSJacobianP func, void *ctx
   Note:
   `Amat` has the same number of rows and the same row parallel layout as `u`, `Amat` has the same number of columns and parallel layout as `p`
 
-.seealso: [](ch_ts), `TSSetRHSJacobianP()`, `TS`, `TSRHSJacobianP`
+.seealso: [](ch_ts), `TSSetRHSJacobianP()`, `TS`, `TSRHSJacobianPFn`
 @*/
-PetscErrorCode TSGetRHSJacobianP(TS ts, Mat *Amat, TSRHSJacobianP *func, void **ctx)
+PetscErrorCode TSGetRHSJacobianP(TS ts, Mat *Amat, TSRHSJacobianPFn **func, void **ctx)
 {
   PetscFunctionBegin;
   if (func) *func = ts->rhsjacobianp;
@@ -1240,7 +1240,7 @@ PetscErrorCode TSAdjointMonitorSetFromOptions(TS ts, const char name[], const ch
   if (flg) {
     PetscViewerAndFormat *vf;
     PetscCall(PetscViewerAndFormatCreate(viewer, format, &vf));
-    PetscCall(PetscObjectDereference((PetscObject)viewer));
+    PetscCall(PetscOptionsRestoreViewer(&viewer));
     if (monitorsetup) PetscCall((*monitorsetup)(ts, vf));
     PetscCall(TSAdjointMonitorSet(ts, (PetscErrorCode(*)(TS, PetscInt, PetscReal, Vec, PetscInt, Vec *, Vec *, void *))monitor, vf, (PetscErrorCode(*)(void **))PetscViewerAndFormatDestroy));
   }

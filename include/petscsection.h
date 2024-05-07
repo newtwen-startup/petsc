@@ -2,6 +2,7 @@
 
 #include <petscsys.h>
 #include <petscis.h>
+#include <petscbt.h>
 #include <petscsectiontypes.h>
 
 /* SUBMANSEC = PetscSection */
@@ -25,6 +26,8 @@ PETSC_EXTERN PetscErrorCode PetscSectionGetChart(PetscSection, PetscInt *, Petsc
 PETSC_EXTERN PetscErrorCode PetscSectionSetChart(PetscSection, PetscInt, PetscInt);
 PETSC_EXTERN PetscErrorCode PetscSectionGetPermutation(PetscSection, IS *);
 PETSC_EXTERN PetscErrorCode PetscSectionSetPermutation(PetscSection, IS);
+PETSC_EXTERN PetscErrorCode PetscSectionGetBlockStarts(PetscSection, PetscBT *);
+PETSC_EXTERN PetscErrorCode PetscSectionSetBlockStarts(PetscSection, PetscBT);
 PETSC_EXTERN PetscErrorCode PetscSectionGetPointMajor(PetscSection, PetscBool *);
 PETSC_EXTERN PetscErrorCode PetscSectionSetPointMajor(PetscSection, PetscBool);
 PETSC_EXTERN PetscErrorCode PetscSectionGetIncludesConstraints(PetscSection, PetscBool *);
@@ -62,12 +65,13 @@ PETSC_EXTERN PetscErrorCode PetscSectionViewFromOptions(PetscSection, PetscObjec
 PETSC_EXTERN PetscErrorCode PetscSectionLoad(PetscSection, PetscViewer);
 PETSC_EXTERN PetscErrorCode PetscSectionReset(PetscSection);
 PETSC_EXTERN PetscErrorCode PetscSectionDestroy(PetscSection *);
-PETSC_EXTERN PetscErrorCode PetscSectionCreateGlobalSection(PetscSection, PetscSF, PetscBool, PetscBool, PetscSection *);
+PETSC_EXTERN PetscErrorCode PetscSectionCreateGlobalSection(PetscSection, PetscSF, PetscBool, PetscBool, PetscBool, PetscSection *);
 PETSC_EXTERN PetscErrorCode PetscSectionCreateGlobalSectionCensored(PetscSection, PetscSF, PetscBool, PetscInt, const PetscInt[], PetscSection *);
 PETSC_EXTERN PetscErrorCode PetscSectionCreateSubsection(PetscSection, PetscInt, const PetscInt[], PetscSection *);
 PETSC_EXTERN PetscErrorCode PetscSectionCreateSupersection(PetscSection[], PetscInt, PetscSection *);
 PETSC_EXTERN PetscErrorCode PetscSectionCreateSubmeshSection(PetscSection, IS, PetscSection *);
 PETSC_EXTERN PetscErrorCode PetscSectionCreateSubdomainSection(PetscSection, IS, PetscSection *);
+PETSC_EXTERN PetscErrorCode PetscSectionCreateComponentSubsection(PetscSection, PetscInt, const PetscInt[], PetscSection *);
 PETSC_EXTERN PetscErrorCode PetscSectionGetPointLayout(MPI_Comm, PetscSection, PetscLayout *);
 PETSC_EXTERN PetscErrorCode PetscSectionGetValueLayout(MPI_Comm, PetscSection, PetscLayout *);
 PETSC_EXTERN PetscErrorCode PetscSectionPermute(PetscSection, IS, PetscSection *);

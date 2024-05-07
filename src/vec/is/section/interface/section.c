@@ -85,6 +85,15 @@ PetscErrorCode PetscSectionCreate(MPI_Comm comm, PetscSection *s)
 @*/
 PetscErrorCode PetscSectionCopy(PetscSection section, PetscSection newSection)
 {
+  PetscFunctionBegin;
+  PetscValidHeaderSpecific(section, PETSC_SECTION_CLASSID, 1);
+  PetscValidHeaderSpecific(newSection, PETSC_SECTION_CLASSID, 2);
+  PetscCall(PetscSectionCopy_Internal(section, newSection, NULL));
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
+PetscErrorCode PetscSectionCopy_Internal(PetscSection section, PetscSection newSection, PetscBT constrained_dofs)
+{
   PetscSectionSym sym;
   IS              perm;
   PetscInt        numFields, f, c, pStart, pEnd, p;
@@ -117,17 +126,20 @@ PetscErrorCode PetscSectionCopy(PetscSection section, PetscSection newSection)
   PetscCall(PetscSectionGetSym(section, &sym));
   PetscCall(PetscSectionSetSym(newSection, sym));
   for (p = pStart; p < pEnd; ++p) {
-    PetscInt dof, cdof, fcdof = 0;
+    PetscInt  dof, cdof, fcdof = 0;
+    PetscBool force_constrained = (PetscBool)(constrained_dofs && PetscBTLookup(constrained_dofs, p - pStart));
 
     PetscCall(PetscSectionGetDof(section, p, &dof));
     PetscCall(PetscSectionSetDof(newSection, p, dof));
-    PetscCall(PetscSectionGetConstraintDof(section, p, &cdof));
+    if (force_constrained) cdof = dof;
+    else PetscCall(PetscSectionGetConstraintDof(section, p, &cdof));
     if (cdof) PetscCall(PetscSectionSetConstraintDof(newSection, p, cdof));
     for (f = 0; f < numFields; ++f) {
       PetscCall(PetscSectionGetFieldDof(section, p, f, &dof));
       PetscCall(PetscSectionSetFieldDof(newSection, p, f, dof));
       if (cdof) {
-        PetscCall(PetscSectionGetFieldConstraintDof(section, p, f, &fcdof));
+        if (force_constrained) fcdof = dof;
+        else PetscCall(PetscSectionGetFieldConstraintDof(section, p, f, &fcdof));
         if (fcdof) PetscCall(PetscSectionSetFieldConstraintDof(newSection, p, f, fcdof));
       }
     }
@@ -136,18 +148,23 @@ PetscErrorCode PetscSectionCopy(PetscSection section, PetscSection newSection)
   for (p = pStart; p < pEnd; ++p) {
     PetscInt        off, cdof, fcdof = 0;
     const PetscInt *cInd;
+    PetscBool       force_constrained = (PetscBool)(constrained_dofs && PetscBTLookup(constrained_dofs, p - pStart));
 
     /* Must set offsets in case they do not agree with the prefix sums */
     PetscCall(PetscSectionGetOffset(section, p, &off));
     PetscCall(PetscSectionSetOffset(newSection, p, off));
-    PetscCall(PetscSectionGetConstraintDof(section, p, &cdof));
+    PetscCall(PetscSectionGetConstraintDof(newSection, p, &cdof));
     if (cdof) {
-      PetscCall(PetscSectionGetConstraintIndices(section, p, &cInd));
+      if (force_constrained) cInd = NULL;
+      else PetscCall(PetscSectionGetConstraintIndices(section, p, &cInd));
       PetscCall(PetscSectionSetConstraintIndices(newSection, p, cInd));
       for (f = 0; f < numFields; ++f) {
-        PetscCall(PetscSectionGetFieldConstraintDof(section, p, f, &fcdof));
+        PetscCall(PetscSectionGetFieldOffset(section, p, f, &off));
+        PetscCall(PetscSectionSetFieldOffset(newSection, p, f, off));
+        PetscCall(PetscSectionGetFieldConstraintDof(newSection, p, f, &fcdof));
         if (fcdof) {
-          PetscCall(PetscSectionGetFieldConstraintIndices(section, p, f, &cInd));
+          if (force_constrained) cInd = NULL;
+          else PetscCall(PetscSectionGetFieldConstraintIndices(section, p, f, &cInd));
           PetscCall(PetscSectionSetFieldConstraintIndices(newSection, p, f, cInd));
         }
       }
@@ -259,7 +276,7 @@ PetscErrorCode PetscSectionCompare(PetscSection s1, PetscSection s2, PetscBool *
   PetscCall(PetscSectionGetPermutation(s2, &perm2));
   if (perm1 && perm2) {
     PetscCall(ISEqual(perm1, perm2, congruent));
-    if (!(*congruent)) goto not_congruent;
+    if (!*congruent) goto not_congruent;
   } else if (perm1 != perm2) goto not_congruent;
 
   for (p = pStart; p < pEnd; ++p) {
@@ -278,7 +295,7 @@ PetscErrorCode PetscSectionCompare(PetscSection s1, PetscSection s2, PetscBool *
     PetscCall(PetscSectionGetConstraintIndices(s1, p, &idx1));
     PetscCall(PetscSectionGetConstraintIndices(s2, p, &idx2));
     PetscCall(PetscArraycmp(idx1, idx2, ncdof, congruent));
-    if (!(*congruent)) goto not_congruent;
+    if (!*congruent) goto not_congruent;
   }
 
   PetscCall(PetscSectionGetNumFields(s1, &nfields));
@@ -306,7 +323,7 @@ PetscErrorCode PetscSectionCompare(PetscSection s1, PetscSection s2, PetscBool *
       PetscCall(PetscSectionGetFieldConstraintIndices(s1, p, f, &idx1));
       PetscCall(PetscSectionGetFieldConstraintIndices(s2, p, f, &idx2));
       PetscCall(PetscArraycmp(idx1, idx2, nfcdof, congruent));
-      if (!(*congruent)) goto not_congruent;
+      if (!*congruent) goto not_congruent;
     }
   }
 
@@ -646,6 +663,7 @@ PetscErrorCode PetscSectionSetChart(PetscSection s, PetscInt pStart, PetscInt pE
 
   PetscFunctionBegin;
   PetscValidHeaderSpecific(s, PETSC_SECTION_CLASSID, 1);
+  PetscCheck(pEnd >= pStart, PETSC_COMM_SELF, PETSC_ERR_ARG_OUTOFRANGE, "Chart pEnd %" PetscInt_FMT " cannot be smaller than chart pStart %" PetscInt_FMT, pEnd, pStart);
   if (pStart == s->pStart && pEnd == s->pEnd) PetscFunctionReturn(PETSC_SUCCESS);
   /* Cannot Reset() because it destroys field information */
   s->setup = PETSC_FALSE;
@@ -703,7 +721,7 @@ PetscErrorCode PetscSectionGetPermutation(PetscSection s, IS *perm)
 
   The data in the `PetscSection` are permuted but the access via `PetscSectionGetFieldOffset()` and `PetscSectionGetOffset()` is not changed
 
-  Compart to `PetscSectionPermute()`
+  Compare to `PetscSectionPermute()`
 
 .seealso: [](sec_scatter), `IS`, `PetscSection`, `PetscSectionSetUp()`, `PetscSectionGetPermutation()`, `PetscSectionPermute()`, `PetscSectionCreate()`
 @*/
@@ -719,6 +737,66 @@ PetscErrorCode PetscSectionSetPermutation(PetscSection s, IS perm)
       s->perm = perm;
       PetscCall(PetscObjectReference((PetscObject)s->perm));
     }
+  }
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
+/*@C
+  PetscSectionGetBlockStarts - Returns a table indicating which points start new blocks
+
+  Not Collective
+
+  Input Parameter:
+. s - the `PetscSection`
+
+  Output Parameter:
+. blockStarts - The `PetscBT` with a 1 for each point that begins a block
+
+  Notes:
+  The table is on [0, `pEnd` - `pStart`).
+
+  This information is used by `DMCreateMatrix()` to create a variable block size description which is set using `MatSetVariableBlockSizes()`.
+
+  Level: intermediate
+
+.seealso: [](sec_scatter), `IS`, `PetscSection`, `PetscSectionSetBlockStarts()`, `PetscSectionCreate()`, `DMCreateMatrix()`, `MatSetVariableBlockSizes()`
+@*/
+PetscErrorCode PetscSectionGetBlockStarts(PetscSection s, PetscBT *blockStarts)
+{
+  PetscFunctionBegin;
+  PetscValidHeaderSpecific(s, PETSC_SECTION_CLASSID, 1);
+  if (blockStarts) {
+    PetscAssertPointer(blockStarts, 2);
+    *blockStarts = s->blockStarts;
+  }
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
+/*@C
+  PetscSectionSetBlockStarts - Sets a table indicating which points start new blocks
+
+  Not Collective
+
+  Input Parameters:
++ s           - the `PetscSection`
+- blockStarts - The `PetscBT` with a 1 for each point that begins a block
+
+  Level: intermediate
+
+  Notes:
+  The table is on [0, `pEnd` - `pStart`). PETSc takes ownership of the `PetscBT` when it is passed in and will destroy it. The user should not destroy it.
+
+  This information is used by `DMCreateMatrix()` to create a variable block size description which is set using `MatSetVariableBlockSizes()`.
+
+.seealso: [](sec_scatter), `IS`, `PetscSection`, `PetscSectionGetBlockStarts()`, `PetscSectionCreate()`, `DMCreateMatrix()`, `MatSetVariableBlockSizes()`
+@*/
+PetscErrorCode PetscSectionSetBlockStarts(PetscSection s, PetscBT blockStarts)
+{
+  PetscFunctionBegin;
+  PetscValidHeaderSpecific(s, PETSC_SECTION_CLASSID, 1);
+  if (s->blockStarts != blockStarts) {
+    PetscCall(PetscBTDestroy(&s->blockStarts));
+    s->blockStarts = blockStarts;
   }
   PetscFunctionReturn(PETSC_SUCCESS);
 }
@@ -859,7 +937,7 @@ PetscErrorCode PetscSectionGetDof(PetscSection s, PetscInt point, PetscInt *numD
   PetscFunctionBeginHot;
   PetscValidHeaderSpecific(s, PETSC_SECTION_CLASSID, 1);
   PetscAssertPointer(numDof, 3);
-  if (PetscDefined(USE_DEBUG)) PetscCheck(point >= s->pStart && point < s->pEnd, PETSC_COMM_SELF, PETSC_ERR_ARG_OUTOFRANGE, "Section point %" PetscInt_FMT " should be in [%" PetscInt_FMT ", %" PetscInt_FMT ")", point, s->pStart, s->pEnd);
+  PetscAssert(point >= s->pStart && point < s->pEnd, PETSC_COMM_SELF, PETSC_ERR_ARG_OUTOFRANGE, "Section point %" PetscInt_FMT " should be in [%" PetscInt_FMT ", %" PetscInt_FMT ")", point, s->pStart, s->pEnd);
   *numDof = s->atlasDof[point - s->pStart];
   PetscFunctionReturn(PETSC_SUCCESS);
 }
@@ -912,7 +990,8 @@ PetscErrorCode PetscSectionAddDof(PetscSection s, PetscInt point, PetscInt numDo
 {
   PetscFunctionBeginHot;
   PetscValidHeaderSpecific(s, PETSC_SECTION_CLASSID, 1);
-  if (PetscDefined(USE_DEBUG)) PetscCheck(point >= s->pStart && point < s->pEnd, PETSC_COMM_SELF, PETSC_ERR_ARG_OUTOFRANGE, "Section point %" PetscInt_FMT " should be in [%" PetscInt_FMT ", %" PetscInt_FMT ")", point, s->pStart, s->pEnd);
+  PetscAssert(point >= s->pStart && point < s->pEnd, PETSC_COMM_SELF, PETSC_ERR_ARG_OUTOFRANGE, "Section point %" PetscInt_FMT " should be in [%" PetscInt_FMT ", %" PetscInt_FMT ")", point, s->pStart, s->pEnd);
+  PetscCheck(numDof >= 0, PETSC_COMM_SELF, PETSC_ERR_ARG_OUTOFRANGE, "numDof %" PetscInt_FMT " should not be negative", numDof);
   s->atlasDof[point - s->pStart] += numDof;
   PetscCall(PetscSectionInvalidateMaxDof_Internal(s));
   PetscFunctionReturn(PETSC_SUCCESS);
@@ -1368,6 +1447,7 @@ PetscErrorCode PetscSectionGetConstrainedStorageSize(PetscSection s, PetscInt *s
   Input Parameters:
 + s                  - The `PetscSection` for the local field layout
 . sf                 - The `PetscSF` describing parallel layout of the section points (leaves are unowned local points)
+. usePermutation     - By default this is `PETSC_TRUE`, meaning any permutation of the local section is transferred to the global section
 . includeConstraints - By default this is `PETSC_FALSE`, meaning that the global field vector will not possess constrained dofs
 - localOffsets       - If `PETSC_TRUE`, use local rather than global offsets for the points
 
@@ -1384,7 +1464,7 @@ PetscErrorCode PetscSectionGetConstrainedStorageSize(PetscSection s, PetscInt *s
 
 .seealso: [PetscSection](sec_petscsection), `PetscSection`, `PetscSectionCreate()`, `PetscSectionCreateGlobalSectionCensored()`
 @*/
-PetscErrorCode PetscSectionCreateGlobalSection(PetscSection s, PetscSF sf, PetscBool includeConstraints, PetscBool localOffsets, PetscSection *gsection)
+PetscErrorCode PetscSectionCreateGlobalSection(PetscSection s, PetscSF sf, PetscBool usePermutation, PetscBool includeConstraints, PetscBool localOffsets, PetscSection *gsection)
 {
   PetscSection    gs;
   const PetscInt *pind = NULL;
@@ -1395,9 +1475,10 @@ PetscErrorCode PetscSectionCreateGlobalSection(PetscSection s, PetscSF sf, Petsc
   PetscFunctionBegin;
   PetscValidHeaderSpecific(s, PETSC_SECTION_CLASSID, 1);
   PetscValidHeaderSpecific(sf, PETSCSF_CLASSID, 2);
-  PetscValidLogicalCollectiveBool(s, includeConstraints, 3);
-  PetscValidLogicalCollectiveBool(s, localOffsets, 4);
-  PetscAssertPointer(gsection, 5);
+  PetscValidLogicalCollectiveBool(s, usePermutation, 3);
+  PetscValidLogicalCollectiveBool(s, includeConstraints, 4);
+  PetscValidLogicalCollectiveBool(s, localOffsets, 5);
+  PetscAssertPointer(gsection, 6);
   PetscCheck(s->pointMajor, PETSC_COMM_SELF, PETSC_ERR_SUP, "No support for field major ordering");
   PetscCall(PetscSectionCreate(PetscObjectComm((PetscObject)s), &gs));
   PetscCall(PetscSectionGetNumFields(s, &numFields));
@@ -1438,7 +1519,7 @@ PetscErrorCode PetscSectionCreateGlobalSection(PetscSection s, PetscSF sf, Petsc
     }
   }
   /* Calculate new sizes, get process offset, and calculate point offsets */
-  if (s->perm) PetscCall(ISGetIndices(s->perm, &pind));
+  if (usePermutation && s->perm) PetscCall(ISGetIndices(s->perm, &pind));
   for (p = 0, off = 0; p < pEnd - pStart; ++p) {
     const PetscInt q = pind ? pind[p] : p;
 
@@ -1454,7 +1535,7 @@ PetscErrorCode PetscSectionCreateGlobalSection(PetscSection s, PetscSF sf, Petsc
     gs->atlasOff[p - pStart] += globalOff;
     if (neg) neg[p] = -(gs->atlasOff[p - pStart] + 1);
   }
-  if (s->perm) PetscCall(ISRestoreIndices(s->perm, &pind));
+  if (usePermutation && s->perm) PetscCall(ISRestoreIndices(s->perm, &pind));
   /* Put in negative offsets for ghost points */
   if (nroots >= 0) {
     PetscCall(PetscArrayzero(recv, nlocal));
@@ -1467,9 +1548,13 @@ PetscErrorCode PetscSectionCreateGlobalSection(PetscSection s, PetscSF sf, Petsc
   PetscCall(PetscFree2(neg, recv));
   /* Set field dofs/offsets/constraints */
   for (f = 0; f < numFields; ++f) {
+    const char *name;
+
     gs->field[f]->includesConstraints = includeConstraints;
     PetscCall(PetscSectionGetFieldComponents(s, f, &numComponents));
     PetscCall(PetscSectionSetFieldComponents(gs, f, numComponents));
+    PetscCall(PetscSectionGetFieldName(s, f, &name));
+    PetscCall(PetscSectionSetFieldName(gs, f, name));
   }
   for (p = pStart; p < pEnd; ++p) {
     PetscCall(PetscSectionGetOffset(gs, p, &off));
@@ -1734,7 +1819,7 @@ PetscErrorCode PetscSectionGetOffset(PetscSection s, PetscInt point, PetscInt *o
   PetscFunctionBegin;
   PetscValidHeaderSpecific(s, PETSC_SECTION_CLASSID, 1);
   PetscAssertPointer(offset, 3);
-  if (PetscDefined(USE_DEBUG)) PetscCheck(!(point < s->pStart) && !(point >= s->pEnd), PETSC_COMM_SELF, PETSC_ERR_ARG_OUTOFRANGE, "Section point %" PetscInt_FMT " should be in [%" PetscInt_FMT ", %" PetscInt_FMT ")", point, s->pStart, s->pEnd);
+  PetscAssert(!(point < s->pStart) && !(point >= s->pEnd), PETSC_COMM_SELF, PETSC_ERR_ARG_OUTOFRANGE, "Section point %" PetscInt_FMT " should be in [%" PetscInt_FMT ", %" PetscInt_FMT ")", point, s->pStart, s->pEnd);
   *offset = s->atlasOff[point - s->pStart];
   PetscFunctionReturn(PETSC_SUCCESS);
 }
@@ -2002,6 +2087,69 @@ PetscErrorCode PetscSectionCreateSubsection(PetscSection s, PetscInt len, const 
     }
     PetscCall(PetscFree(indices));
   }
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
+/*@
+  PetscSectionCreateComponentSubsection - Create a new, smaller `PetscSection` composed of only selected components
+
+  Collective
+
+  Input Parameters:
++ s     - the `PetscSection`
+. len   - the number of components
+- comps - the component numbers
+
+  Output Parameter:
+. subs - the subsection
+
+  Level: advanced
+
+  Notes:
+  The chart of `subs` is the same as the chart of `s`
+
+  This will error if the section has more than one field, or if a component number is out of range
+
+.seealso: [PetscSection](sec_petscsection), `PetscSection`, `PetscSectionCreateSupersection()`, `PetscSectionCreate()`
+@*/
+PetscErrorCode PetscSectionCreateComponentSubsection(PetscSection s, PetscInt len, const PetscInt comps[], PetscSection *subs)
+{
+  PetscSectionSym sym;
+  const char     *name = NULL;
+  PetscInt        Nf, pStart, pEnd;
+
+  PetscFunctionBegin;
+  if (!len) PetscFunctionReturn(PETSC_SUCCESS);
+  PetscValidHeaderSpecific(s, PETSC_SECTION_CLASSID, 1);
+  PetscAssertPointer(comps, 3);
+  PetscAssertPointer(subs, 4);
+  PetscCall(PetscSectionGetNumFields(s, &Nf));
+  PetscCheck(Nf == 1, PetscObjectComm((PetscObject)s), PETSC_ERR_ARG_WRONG, "This method can only handle one field, not %" PetscInt_FMT, Nf);
+  PetscCall(PetscSectionCreate(PetscObjectComm((PetscObject)s), subs));
+  PetscCall(PetscSectionSetNumFields(*subs, 1));
+  PetscCall(PetscSectionGetFieldName(s, 0, &name));
+  PetscCall(PetscSectionSetFieldName(*subs, 0, name));
+  PetscCall(PetscSectionSetFieldComponents(*subs, 0, len));
+  PetscCall(PetscSectionGetFieldSym(s, 0, &sym));
+  PetscCall(PetscSectionSetFieldSym(*subs, 0, sym));
+  for (PetscInt c = 0; c < len; ++c) {
+    PetscCall(PetscSectionGetComponentName(s, 0, comps[c], &name));
+    PetscCall(PetscSectionSetComponentName(*subs, 0, c, name));
+  }
+  PetscCall(PetscSectionGetChart(s, &pStart, &pEnd));
+  PetscCall(PetscSectionSetChart(*subs, pStart, pEnd));
+  for (PetscInt p = pStart; p < pEnd; ++p) {
+    PetscInt dof, cdof, cfdof;
+
+    PetscCall(PetscSectionGetDof(s, p, &dof));
+    if (!dof) continue;
+    PetscCall(PetscSectionGetFieldConstraintDof(s, p, 0, &cfdof));
+    PetscCall(PetscSectionGetConstraintDof(s, p, &cdof));
+    PetscCheck(!cdof && !cfdof, PETSC_COMM_SELF, PETSC_ERR_ARG_WRONG, "Component selection does not work with constraints");
+    PetscCall(PetscSectionSetFieldDof(*subs, p, 0, len));
+    PetscCall(PetscSectionSetDof(*subs, p, len));
+  }
+  PetscCall(PetscSectionSetUp(*subs));
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
@@ -2287,9 +2435,8 @@ static PetscErrorCode PetscSectionView_ASCII(PetscSection s, PetscViewer viewer)
   PetscCall(PetscViewerASCIIPushSynchronized(viewer));
   PetscCall(PetscViewerASCIISynchronizedPrintf(viewer, "Process %d:\n", rank));
   for (p = 0; p < s->pEnd - s->pStart; ++p) {
-    if ((s->bc) && (s->bc->atlasDof[p] > 0)) {
+    if (s->bc && s->bc->atlasDof[p] > 0) {
       PetscInt b;
-
       PetscCall(PetscViewerASCIISynchronizedPrintf(viewer, "  (%4" PetscInt_FMT ") dim %2" PetscInt_FMT " offset %3" PetscInt_FMT " constrained", p + s->pStart, s->atlasDof[p], s->atlasOff[p]));
       if (s->bcIndices) {
         for (b = 0; b < s->bc->atlasDof[p]; ++b) PetscCall(PetscViewerASCIISynchronizedPrintf(viewer, " %" PetscInt_FMT, s->bcIndices[s->bc->atlasOff[p] + b]));
@@ -2371,7 +2518,7 @@ PetscErrorCode PetscSectionView(PetscSection s, PetscViewer viewer)
     if (s->numFields) {
       PetscCall(PetscViewerASCIIPrintf(viewer, "%" PetscInt_FMT " fields\n", s->numFields));
       for (f = 0; f < s->numFields; ++f) {
-        PetscCall(PetscViewerASCIIPrintf(viewer, "  field %" PetscInt_FMT " with %" PetscInt_FMT " components\n", f, s->numFieldComponents[f]));
+        PetscCall(PetscViewerASCIIPrintf(viewer, "  field %" PetscInt_FMT " \"%s\" with %" PetscInt_FMT " components\n", f, s->fieldNames[f], s->numFieldComponents[f]));
         PetscCall(PetscSectionView_ASCII(s->field[f], viewer));
       }
     } else {
@@ -2485,6 +2632,7 @@ PetscErrorCode PetscSectionReset(PetscSection s)
   PetscCall(PetscSectionDestroy(&s->clSection));
   PetscCall(ISDestroy(&s->clPoints));
   PetscCall(ISDestroy(&s->perm));
+  PetscCall(PetscBTDestroy(&s->blockStarts));
   PetscCall(PetscSectionResetClosurePermutation(s));
   PetscCall(PetscSectionSymDestroy(&s->sym));
   PetscCall(PetscSectionDestroy(&s->clSection));
@@ -2516,7 +2664,7 @@ PetscErrorCode PetscSectionDestroy(PetscSection *s)
   PetscFunctionBegin;
   if (!*s) PetscFunctionReturn(PETSC_SUCCESS);
   PetscValidHeaderSpecific(*s, PETSC_SECTION_CLASSID, 1);
-  if (--((PetscObject)(*s))->refct > 0) {
+  if (--((PetscObject)*s)->refct > 0) {
     *s = NULL;
     PetscFunctionReturn(PETSC_SUCCESS);
   }
@@ -2552,7 +2700,7 @@ static PetscErrorCode VecIntSetValuesSection_Private(PetscInt *baseArray, PetscS
       PetscInt       i;
 
       if (mode == INSERT_VALUES) {
-        for (i = 0; i < dim; ++i) array[i] = values[i];
+        for (i = 0; i < dim; ++i) array[i] = values ? values[i] : i;
       } else {
         for (i = 0; i < dim; ++i) array[i] += values[i];
       }
@@ -2563,7 +2711,7 @@ static PetscErrorCode VecIntSetValuesSection_Private(PetscInt *baseArray, PetscS
       for (field = 0; field < s->numFields; ++field) {
         const PetscInt dim = s->field[field]->atlasDof[p];
 
-        for (i = dim - 1; i >= 0; --i) array[++j] = values[i + offset];
+        for (i = dim - 1; i >= 0; --i) array[++j] = values ? values[i + offset] : i + offset;
         offset += dim;
       }
     }
@@ -2580,7 +2728,7 @@ static PetscErrorCode VecIntSetValuesSection_Private(PetscInt *baseArray, PetscS
             ++cInd;
             continue;
           }
-          array[i] = values[i];
+          array[i] = values ? values[i] : i;
         }
       } else {
         for (i = 0; i < dim; ++i) {
@@ -2609,7 +2757,7 @@ static PetscErrorCode VecIntSetValuesSection_Private(PetscInt *baseArray, PetscS
             ++cInd;
             continue;
           }
-          array[j] = values[k];
+          array[j] = values ? values[k] : k;
         }
         offset += dim;
         cOffset += dim - tDim;
@@ -2698,7 +2846,8 @@ PetscErrorCode PetscSectionSetConstraintIndices(PetscSection s, PetscInt point, 
     const PetscInt cdof = s->bc->atlasDof[point];
     PetscInt       d;
 
-    for (d = 0; d < cdof; ++d) PetscCheck(indices[d] < dof, PETSC_COMM_SELF, PETSC_ERR_ARG_OUTOFRANGE, "Point %" PetscInt_FMT " dof %" PetscInt_FMT ", invalid constraint index[%" PetscInt_FMT "]: %" PetscInt_FMT, point, dof, d, indices[d]);
+    if (indices)
+      for (d = 0; d < cdof; ++d) PetscCheck(indices[d] < dof, PETSC_COMM_SELF, PETSC_ERR_ARG_OUTOFRANGE, "Point %" PetscInt_FMT " dof %" PetscInt_FMT ", invalid constraint index[%" PetscInt_FMT "]: %" PetscInt_FMT, point, dof, d, indices[d]);
     PetscCall(VecIntSetValuesSection_Private(s->bcIndices, s->bc, point, indices, INSERT_VALUES));
   }
   PetscFunctionReturn(PETSC_SUCCESS);
@@ -2759,12 +2908,6 @@ PetscErrorCode PetscSectionSetFieldConstraintIndices(PetscSection s, PetscInt po
 {
   PetscFunctionBegin;
   PetscValidHeaderSpecific(s, PETSC_SECTION_CLASSID, 1);
-  if (PetscDefined(USE_DEBUG)) {
-    PetscInt nfdof;
-
-    PetscCall(PetscSectionGetFieldConstraintDof(s, point, field, &nfdof));
-    if (nfdof) PetscAssertPointer(indices, 4);
-  }
   PetscSectionCheckValidField(field, s->numFields);
   PetscCall(PetscSectionSetConstraintIndices(s->field[field], point, indices));
   PetscFunctionReturn(PETSC_SUCCESS);
@@ -3039,6 +3182,7 @@ PetscErrorCode PetscSectionGetClosurePermutation(PetscSection section, PetscObje
 
   PetscFunctionBegin;
   PetscCall(PetscSectionGetClosurePermutation_Private(section, obj, depth, clSize, &clPerm));
+  PetscCheck(clPerm, PetscObjectComm((PetscObject)obj), PETSC_ERR_ARG_WRONG, "There is no closure permutation associated with this object for depth %" PetscInt_FMT " of size %" PetscInt_FMT, depth, clSize);
   PetscCall(ISCreateGeneral(PETSC_COMM_SELF, clSize, clPerm, PETSC_USE_POINTER, perm));
   PetscFunctionReturn(PETSC_SUCCESS);
 }
@@ -3241,12 +3385,12 @@ PetscErrorCode PetscSectionSymDestroy(PetscSectionSym *sym)
 
   PetscFunctionBegin;
   if (!*sym) PetscFunctionReturn(PETSC_SUCCESS);
-  PetscValidHeaderSpecific((*sym), PETSC_SECTION_SYM_CLASSID, 1);
-  if (--((PetscObject)(*sym))->refct > 0) {
+  PetscValidHeaderSpecific(*sym, PETSC_SECTION_SYM_CLASSID, 1);
+  if (--((PetscObject)*sym)->refct > 0) {
     *sym = NULL;
     PetscFunctionReturn(PETSC_SUCCESS);
   }
-  if ((*sym)->ops->destroy) PetscCall((*(*sym)->ops->destroy)(*sym));
+  PetscTryTypeMethod(*sym, destroy);
   PetscCheck(!(*sym)->workout, PETSC_COMM_SELF, PETSC_ERR_ARG_WRONGSTATE, "Work array still checked out");
   for (link = (*sym)->workin; link; link = next) {
     PetscInt    **perms = (PetscInt **)link->perms;
@@ -3302,7 +3446,7 @@ PetscErrorCode PetscSectionSetSym(PetscSection section, PetscSectionSym sym)
 {
   PetscFunctionBegin;
   PetscValidHeaderSpecific(section, PETSC_SECTION_CLASSID, 1);
-  PetscCall(PetscSectionSymDestroy(&(section->sym)));
+  PetscCall(PetscSectionSymDestroy(&section->sym));
   if (sym) {
     PetscValidHeaderSpecific(sym, PETSC_SECTION_SYM_CLASSID, 2);
     PetscCheckSameComm(section, 1, sym, 2);
@@ -3484,7 +3628,7 @@ PetscErrorCode PetscSectionGetPointSyms(PetscSection section, PetscInt numPoints
     sym->workout = link;
     PetscCall(PetscArrayzero((PetscInt **)link->perms, numPoints));
     PetscCall(PetscArrayzero((PetscInt **)link->rots, numPoints));
-    PetscCall((*sym->ops->getpoints)(sym, section, numPoints, points, link->perms, link->rots));
+    PetscUseTypeMethod(sym, getpoints, section, numPoints, points, link->perms, link->rots);
     if (perms) *perms = link->perms;
     if (rots) *rots = link->rots;
   }
@@ -3500,8 +3644,8 @@ PetscErrorCode PetscSectionGetPointSyms(PetscSection section, PetscInt numPoints
 + section   - the section
 . numPoints - the number of points
 . points    - an array of size 2 * `numPoints`, containing a list of (point, orientation) pairs. (An orientation is an
-    arbitrary integer: its interpretation is up to sym.  Orientations are used by `DM`: for their interpretation in that
-    context, see `DMPlexGetConeOrientation()`).
+              arbitrary integer: its interpretation is up to sym.  Orientations are used by `DM`: for their interpretation in that
+              context, see `DMPlexGetConeOrientation()`).
 . perms     - The permutations for the given orientations: set to `NULL` at conclusion
 - rots      - The field rotations symmetries for the given orientations: set to `NULL` at conclusion
 

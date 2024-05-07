@@ -1,8 +1,11 @@
 #include <petsc/private/deviceimpl.h>
+#include <petsc/private/kokkosimpl.hpp>
 #include <petscpkg_version.h>
 #include <petsc_kokkos.hpp>
 
-PetscBool PetscKokkosInitialized = PETSC_FALSE;
+PetscBool    PetscKokkosInitialized = PETSC_FALSE;
+PetscScalar *PetscScalarPool        = nullptr;
+PetscInt     PetscScalarPoolSize    = 0;
 
 Kokkos::DefaultExecutionSpace *PetscKokkosExecutionSpacePtr = nullptr;
 
@@ -10,7 +13,12 @@ PetscErrorCode PetscKokkosFinalize_Private(void)
 {
   PetscFunctionBegin;
   PetscCallCXX(delete PetscKokkosExecutionSpacePtr);
-  Kokkos::finalize();
+  PetscCallCXX(Kokkos::kokkos_free(PetscScalarPool));
+  PetscScalarPoolSize = 0;
+  if (PetscBeganKokkos) {
+    PetscCallCXX(Kokkos::finalize());
+    PetscBeganKokkos = PETSC_FALSE;
+  }
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
@@ -29,7 +37,7 @@ PetscErrorCode PetscKokkosInitializeCheck(void)
 #if PETSC_PKG_KOKKOS_VERSION_GE(3, 7, 0)
     auto args = Kokkos::InitializationSettings();
 #else
-    auto args             = Kokkos::InitArguments{}; /* use default constructor */
+    auto args = Kokkos::InitArguments{}; /* use default constructor */
 #endif
 
 #if (defined(KOKKOS_ENABLE_CUDA) && PetscDefined(HAVE_CUDA)) || (defined(KOKKOS_ENABLE_HIP) && PetscDefined(HAVE_HIP)) || (defined(KOKKOS_ENABLE_SYCL) && PetscDefined(HAVE_SYCL))
@@ -79,6 +87,11 @@ PetscErrorCode PetscKokkosInitializeCheck(void)
     PetscCallCXX(PetscKokkosExecutionSpacePtr = new Kokkos::DefaultExecutionSpace());
 #endif
   }
-  PetscKokkosInitialized = PETSC_TRUE;
+  if (!PetscScalarPoolSize) { // A pool for a small count of PetscScalars
+    PetscScalarPoolSize = 1024;
+    PetscCallCXX(PetscScalarPool = static_cast<PetscScalar *>(Kokkos::kokkos_malloc(sizeof(PetscScalar) * PetscScalarPoolSize)));
+  }
+
+  PetscKokkosInitialized = PETSC_TRUE; // PetscKokkosInitializeCheck() was called
   PetscFunctionReturn(PETSC_SUCCESS);
 }

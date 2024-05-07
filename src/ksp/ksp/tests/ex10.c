@@ -51,7 +51,7 @@ int main(int argc, char **args)
   PetscCall(VecAssemblyBegin(u));
   PetscCall(VecAssemblyEnd(u));
 
-  /* Compute right-hand-side */
+  /* Compute right-hand side */
   PetscCall(MatMult(mat, u, b));
 
   /* Solve linear system */
@@ -495,7 +495,7 @@ PetscErrorCode paulintegrate20(PetscReal K[60][60])
 /*TEST
 
     test:
-      args: -matconvert_type seqaij -ksp_monitor_short -ksp_rtol 1.e-2  -pc_type jacobi
+      args: -matconvert_type seqaij -ksp_monitor_short -ksp_rtol 1.e-2 -pc_type jacobi
       requires: x
 
 TEST*/

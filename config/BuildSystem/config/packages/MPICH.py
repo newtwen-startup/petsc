@@ -4,9 +4,9 @@ import os
 class Configure(config.package.GNUPackage):
   def __init__(self, framework):
     config.package.GNUPackage.__init__(self, framework)
-    self.version          = '4.1.2'
+    self.version          = '4.2.1'
     self.download         = ['https://github.com/pmodels/mpich/releases/download/v'+self.version+'/mpich-'+self.version+'.tar.gz',
-                             'https://www.mpich.org/static/downloads/'+self.version+'/mpich-'+self.version+'.tar.gz', # does not always work from Python? So add in ftp.mcs URL below
+                             'https://www.mpich.org/static/downloads/'+self.version+'/mpich-'+self.version+'.tar.gz', # does not always work from Python? So add in web.cels URL below
                              'https://web.cels.anl.gov/projects/petsc/download/externalpackages'+'/mpich-'+self.version+'.tar.gz']
     self.download_git     = ['git://https://github.com/pmodels/mpich.git']
     self.gitsubmodules    = ['.']
@@ -78,8 +78,9 @@ class Configure(config.package.GNUPackage):
     if 'download-mpich-device' in self.argDB:
       mpich_device = self.argDB['download-mpich-device']
     args.append('--with-device='+mpich_device)
-    # make MPICH behave properly for valgrind
-    args.append('--enable-g=meminit')
+    # meminit: preinitialize memory associated structures and unions to eliminate access warnings from programs like valgrind
+    # dbg: add compiler flag, -g, to all internal compiler flag i.e. MPICHLIB_CFLAGS, MPICHLIB_CXXFLAGS, MPICHLIB_FFLAGS, and MPICHLIB_FCFLAGS, to make debugging easier
+    args.append('--enable-g=meminit,dbg')
     if not self.setCompilers.isDarwin(self.log) and config.setCompilers.Configure.isClang(self.setCompilers.CC, self.log):
       args.append('pac_cv_have_float16=no')
     if config.setCompilers.Configure.isDarwin(self.log):

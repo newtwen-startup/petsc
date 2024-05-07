@@ -13,7 +13,7 @@
 typedef struct {
   PetscScalar  *v;             /* matrix elements */
   PetscScalar  *unplacedarray; /* if one called MatDensePlaceArray(), this is where it stashed the original */
-  PetscBool     roworiented;   /* if true, row oriented input (default) */
+  PetscBool     roworiented;   /* if true, row-oriented input (default) */
   PetscInt      pad;           /* padding */
   PetscBLASInt *pivots;        /* pivots in LU factorization */
   PetscBLASInt  lfwork;        /* length of work array in factorization */
@@ -63,6 +63,8 @@ PETSC_INTERN PetscErrorCode MatDestroy_SeqDense(Mat);
 PETSC_INTERN PetscErrorCode MatDenseGetArray_SeqDense(Mat, PetscScalar *[]);
 PETSC_INTERN PetscErrorCode MatDenseRestoreArray_SeqDense(Mat, PetscScalar *[]);
 PETSC_INTERN PetscErrorCode MatAXPY_SeqDense(Mat, PetscScalar, Mat, MatStructure);
+PETSC_INTERN PetscErrorCode MatMultHermitianTransposeAdd_SeqDense(Mat, Vec, Vec, Vec);
+PETSC_INTERN PetscErrorCode MatMultHermitianTranspose_SeqDense(Mat, Vec, Vec);
 PETSC_INTERN PetscErrorCode MatMultTransposeAdd_SeqDense(Mat, Vec, Vec, Vec);
 PETSC_INTERN PetscErrorCode MatMultTranspose_SeqDense(Mat, Vec, Vec);
 PETSC_INTERN PetscErrorCode MatMultAdd_SeqDense(Mat, Vec, Vec, Vec);
@@ -93,6 +95,10 @@ PETSC_INTERN PetscErrorCode MatZeroEntries_SeqDense(Mat);
 PETSC_INTERN PetscErrorCode MatSetUp_SeqDense(Mat);
 PETSC_INTERN PetscErrorCode MatSetRandom_SeqDense(Mat, PetscRandom);
 PETSC_INTERN PetscErrorCode MatGetDiagonal_SeqDense(Mat, Vec);
+
+PETSC_INTERN PetscErrorCode MatMultAddColumnRange_SeqDense(Mat, Vec, Vec, Vec, PetscInt, PetscInt);
+PETSC_INTERN PetscErrorCode MatMultHermitianTransposeColumnRange_SeqDense(Mat, Vec, Vec, PetscInt, PetscInt);
+PETSC_INTERN PetscErrorCode MatMultHermitianTransposeAddColumnRange_SeqDense(Mat, Vec, Vec, Vec, PetscInt, PetscInt);
 
 #if defined(PETSC_HAVE_CUDA)
 PETSC_SINGLE_LIBRARY_INTERN PetscErrorCode MatSeqDenseCUDAInvertFactors_Internal(Mat);

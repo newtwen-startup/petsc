@@ -58,7 +58,7 @@ int main(int argc, char **argv)
 
   PetscCall(PetscSubcommDestroy(&psubsubcomm));
   PetscCall(PetscSubcommDestroy(&psubcomm));
-  PetscCall(PetscViewerDestroy(&viewer));
+  PetscCall(PetscOptionsRestoreViewer(&viewer));
   PetscCall(PetscFinalize());
   return 0;
 }
@@ -68,5 +68,10 @@ int main(int argc, char **argv)
    test:
       nsize: 4
       args: -viewer
+
+   test:
+      suffix: 2
+      nsize: 4
+      args: -viewer -psubcomm_type interlaced
 
 TEST*/

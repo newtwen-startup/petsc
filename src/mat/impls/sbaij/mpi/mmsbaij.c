@@ -6,7 +6,7 @@
 PetscErrorCode MatSetUpMultiply_MPISBAIJ(Mat mat)
 {
   Mat_MPISBAIJ   *sbaij = (Mat_MPISBAIJ *)mat->data;
-  Mat_SeqBAIJ    *B     = (Mat_SeqBAIJ *)(sbaij->B->data);
+  Mat_SeqBAIJ    *B     = (Mat_SeqBAIJ *)sbaij->B->data;
   PetscInt        i, j, *aj = B->j, ec = 0, *garray, *sgarray;
   PetscInt        bs = mat->rmap->bs, *stmp, mbs = sbaij->mbs, vec_size, nt;
   IS              from, to;
@@ -155,11 +155,11 @@ PetscErrorCode MatSetUpMultiply_MPISBAIJ(Mat mat)
   PetscCall(VecGetLocalSize(sbaij->slvec1, &nt));
   PetscCall(VecGetArray(sbaij->slvec1, &ptr));
   PetscCall(VecCreateSeqWithArray(PETSC_COMM_SELF, 1, bs * mbs, ptr, &sbaij->slvec1a));
-  PetscCall(VecCreateSeqWithArray(PETSC_COMM_SELF, 1, nt - bs * mbs, ptr + bs * mbs, &sbaij->slvec1b));
+  PetscCall(VecCreateSeqWithArray(PETSC_COMM_SELF, 1, nt - bs * mbs, PetscSafePointerPlusOffset(ptr, bs * mbs), &sbaij->slvec1b));
   PetscCall(VecRestoreArray(sbaij->slvec1, &ptr));
 
   PetscCall(VecGetArray(sbaij->slvec0, &ptr));
-  PetscCall(VecCreateSeqWithArray(PETSC_COMM_SELF, 1, nt - bs * mbs, ptr + bs * mbs, &sbaij->slvec0b));
+  PetscCall(VecCreateSeqWithArray(PETSC_COMM_SELF, 1, nt - bs * mbs, PetscSafePointerPlusOffset(ptr, bs * mbs), &sbaij->slvec0b));
   PetscCall(VecRestoreArray(sbaij->slvec0, &ptr));
 
   PetscCall(PetscFree(stmp));

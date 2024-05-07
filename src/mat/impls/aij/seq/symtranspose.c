@@ -98,23 +98,33 @@ PetscErrorCode MatTranspose_SeqAIJ(Mat A, MatReuse reuse, Mat *B)
   PetscCall(PetscArraycpy(atfill, ati, an));
 
   /* Walk through A row-wise and mark nonzero entries of A^T. */
-  for (i = 0; i < am; i++) {
-    anzj = ai[i + 1] - ai[i];
-    for (j = 0; j < anzj; j++) {
-      atj[atfill[*aj]] = i;
-      ata[atfill[*aj]] = *aa++;
-      atfill[*aj++] += 1;
+  if (aa) {
+    for (i = 0; i < am; i++) {
+      anzj = ai[i + 1] - ai[i];
+      for (j = 0; j < anzj; j++) {
+        atj[atfill[*aj]] = i;
+        ata[atfill[*aj]] = *aa++;
+        atfill[*aj++] += 1;
+      }
+    }
+  } else {
+    for (i = 0; i < am; i++) {
+      anzj = ai[i + 1] - ai[i];
+      for (j = 0; j < anzj; j++) {
+        atj[atfill[*aj]] = i;
+        atfill[*aj++] += 1;
+      }
     }
   }
   PetscCall(PetscFree(atfill));
   PetscCall(MatSeqAIJRestoreArrayRead(A, &av));
-  if (reuse == MAT_REUSE_MATRIX) PetscCall(PetscObjectStateIncrease((PetscObject)(*B)));
+  if (reuse == MAT_REUSE_MATRIX) PetscCall(PetscObjectStateIncrease((PetscObject)*B));
 
   if (reuse == MAT_INITIAL_MATRIX || reuse == MAT_INPLACE_MATRIX || nonzerochange) {
     PetscCall(MatCreateSeqAIJWithArrays(PetscObjectComm((PetscObject)A), an, am, ati, atj, ata, &At));
     PetscCall(MatSetBlockSizes(At, PetscAbs(A->cmap->bs), PetscAbs(A->rmap->bs)));
     PetscCall(MatSetType(At, ((PetscObject)A)->type_name));
-    at          = (Mat_SeqAIJ *)(At->data);
+    at          = (Mat_SeqAIJ *)At->data;
     at->free_a  = PETSC_TRUE;
     at->free_ij = PETSC_TRUE;
     at->nonew   = 0;
@@ -160,7 +170,7 @@ PetscErrorCode MatGetSymbolicTransposeReduced_SeqAIJ(Mat A, PetscInt rstart, Pet
   PetscCall(PetscArraycpy(atfill, ati, an));
 
   /* Walk through A row-wise and mark nonzero entries of A^T. */
-  aj = aj + ai[rstart];
+  aj = PetscSafePointerPlusOffset(aj, ai[rstart]);
   for (i = rstart; i < rend; i++) {
     anzj = ai[i + 1] - ai[i];
     for (j = 0; j < anzj; j++) {

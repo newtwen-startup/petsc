@@ -11,15 +11,16 @@ PetscLogEvent PC_ApplySymmetricRight, PC_ModifySubMatrices, PC_ApplyOnBlocks, PC
 PetscInt      PetscMGLevelId;
 PetscLogStage PCMPIStage;
 
-PetscErrorCode PCGetDefaultType_Private(PC pc, const char *type[])
+PETSC_INTERN PetscErrorCode PCGetDefaultType_Private(PC pc, const char *type[])
 {
   PetscMPIInt size;
-  PetscBool   hasop, flg1, flg2, set, flg3, isnormal;
+  PetscBool   hasopblock, hasopsolve, flg1, flg2, set, flg3, isnormal;
 
   PetscFunctionBegin;
   PetscCallMPI(MPI_Comm_size(PetscObjectComm((PetscObject)pc), &size));
   if (pc->pmat) {
-    PetscCall(MatHasOperation(pc->pmat, MATOP_GET_DIAGONAL_BLOCK, &hasop));
+    PetscCall(MatHasOperation(pc->pmat, MATOP_GET_DIAGONAL_BLOCK, &hasopblock));
+    PetscCall(MatHasOperation(pc->pmat, MATOP_SOLVE, &hasopsolve));
     if (size == 1) {
       PetscCall(MatGetFactorAvailable(pc->pmat, "petsc", MAT_FACTOR_ICC, &flg1));
       PetscCall(MatGetFactorAvailable(pc->pmat, "petsc", MAT_FACTOR_ILU, &flg2));
@@ -31,25 +32,23 @@ PetscErrorCode PCGetDefaultType_Private(PC pc, const char *type[])
         *type = PCILU;
       } else if (isnormal) {
         *type = PCNONE;
-      } else if (hasop) { /* likely is a parallel matrix run on one processor */
+      } else if (hasopblock) { /* likely is a parallel matrix run on one processor */
         *type = PCBJACOBI;
+      } else if (hasopsolve) {
+        *type = PCMAT;
       } else {
         *type = PCNONE;
       }
     } else {
-      if (hasop) {
+      if (hasopblock) {
         *type = PCBJACOBI;
+      } else if (hasopsolve) {
+        *type = PCMAT;
       } else {
         *type = PCNONE;
       }
     }
-  } else {
-    if (size == 1) {
-      *type = PCILU;
-    } else {
-      *type = PCBJACOBI;
-    }
-  }
+  } else *type = NULL;
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
@@ -98,8 +97,8 @@ PetscErrorCode PCDestroy(PC *pc)
 {
   PetscFunctionBegin;
   if (!*pc) PetscFunctionReturn(PETSC_SUCCESS);
-  PetscValidHeaderSpecific((*pc), PC_CLASSID, 1);
-  if (--((PetscObject)(*pc))->refct > 0) {
+  PetscValidHeaderSpecific(*pc, PC_CLASSID, 1);
+  if (--((PetscObject)*pc)->refct > 0) {
     *pc = NULL;
     PetscFunctionReturn(PETSC_SUCCESS);
   }
@@ -108,7 +107,7 @@ PetscErrorCode PCDestroy(PC *pc)
 
   /* if memory was published with SAWs then destroy it */
   PetscCall(PetscObjectSAWsViewOff((PetscObject)*pc));
-  PetscTryTypeMethod((*pc), destroy);
+  PetscTryTypeMethod(*pc, destroy);
   PetscCall(DMDestroy(&(*pc)->dm));
   PetscCall(PetscHeaderDestroy(pc));
   PetscFunctionReturn(PETSC_SUCCESS);
@@ -849,7 +848,7 @@ PetscErrorCode PCApplyBAorABTranspose(PC pc, PCSide side, Vec x, Vec y, Vec work
 
   Level: developer
 
-.seealso: [](ch_ksp), `PC`, `PCRICHARDSON`, `PCApplyRichardson()`
+.seealso: [](ch_ksp), `PC`, `KSPRICHARDSON`, `PCApplyRichardson()`
 @*/
 PetscErrorCode PCApplyRichardsonExists(PC pc, PetscBool *exists)
 {
@@ -870,7 +869,7 @@ PetscErrorCode PCApplyRichardsonExists(PC pc, PetscBool *exists)
 
   Input Parameters:
 + pc        - the preconditioner context
-. b         - the right hand side
+. b         - the right-hand side
 . w         - one work vector
 . rtol      - relative decrease in residual norm convergence criteria
 . abstol    - absolute residual norm convergence criteria
@@ -1049,7 +1048,7 @@ PetscErrorCode PCSetUp(PC pc)
   PetscCall(PetscObjectStateGet((PetscObject)pc->pmat, &matstate));
   PetscCall(MatGetNonzeroState(pc->pmat, &matnonzerostate));
   if (!pc->setupcalled) {
-    PetscCall(PetscInfo(pc, "Setting up PC for first time\n"));
+    //PetscCall(PetscInfo(pc, "Setting up PC for first time\n"));
     pc->flag = DIFFERENT_NONZERO_PATTERN;
   } else if (matstate == pc->matstate) PetscFunctionReturn(PETSC_SUCCESS);
   else {
@@ -1057,7 +1056,7 @@ PetscErrorCode PCSetUp(PC pc)
       PetscCall(PetscInfo(pc, "Setting up PC with different nonzero pattern\n"));
       pc->flag = DIFFERENT_NONZERO_PATTERN;
     } else {
-      PetscCall(PetscInfo(pc, "Setting up PC with same nonzero pattern\n"));
+      //PetscCall(PetscInfo(pc, "Setting up PC with same nonzero pattern\n"));
       pc->flag = SAME_NONZERO_PATTERN;
     }
   }
@@ -1553,7 +1552,7 @@ PetscErrorCode PCGetOptionsPrefix(PC pc, const char *prefix[])
 }
 
 /*
-   Indicates the right hand side will be changed by KSPSolve(), this occurs for a few
+   Indicates the right-hand side will be changed by KSPSolve(), this occurs for a few
   preconditioners including BDDC and Eisentat that transform the equations before applying
   the Krylov methods
 */
@@ -1607,7 +1606,7 @@ PetscErrorCode PCPreSolve(PC pc, KSP ksp)
   PetscCall(KSPGetRhs(ksp, &rhs));
 
   if (pc->ops->presolve) PetscUseTypeMethod(pc, presolve, ksp, rhs, x);
-  else if (pc->presolve) PetscCall((pc->presolve)(pc, ksp));
+  else if (pc->presolve) PetscCall(pc->presolve(pc, ksp));
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 

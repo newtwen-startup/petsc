@@ -9,7 +9,8 @@ int main(int argc, char **argv)
   PetscMPIInt rank;
   DM          da1, da2, packer;
   Vec         local, global, globals[2], buffer;
-  PetscScalar value;
+  PetscScalar value, *array;
+  PetscInt    n;
   PetscViewer viewer;
 
   PetscFunctionBeginUser;
@@ -36,8 +37,14 @@ int main(int argc, char **argv)
   PetscCall(VecSet(globals[1], value));
   PetscCallMPI(MPI_Comm_rank(PETSC_COMM_WORLD, &rank));
   value = rank + 1;
-  PetscCall(VecScale(globals[0], value));
-  PetscCall(VecScale(globals[1], value));
+  PetscCall(VecGetLocalSize(globals[0], &n));
+  PetscCall(VecGetArray(globals[0], &array));
+  for (PetscInt i = 0; i < n; i++) array[i] *= value;
+  PetscCall(VecRestoreArray(globals[0], &array));
+  PetscCall(VecGetLocalSize(globals[1], &n));
+  PetscCall(VecGetArray(globals[1], &array));
+  for (PetscInt i = 0; i < n; i++) array[i] *= value;
+  PetscCall(VecRestoreArray(globals[1], &array));
   PetscCall(DMCompositeRestoreAccessArray(packer, global, 2, NULL, globals));
 
   /* Test GlobalToLocal in insert mode */
@@ -45,11 +52,10 @@ int main(int argc, char **argv)
   PetscCall(DMGlobalToLocalEnd(packer, global, INSERT_VALUES, local));
 
   PetscCall(PetscViewerASCIIPushSynchronized(PETSC_VIEWER_STDOUT_WORLD));
-  PetscCall(PetscViewerASCIISynchronizedPrintf(PETSC_VIEWER_STDOUT_WORLD, "\nLocal Vector: processor %d\n", rank));
   PetscCall(PetscViewerGetSubViewer(PETSC_VIEWER_STDOUT_WORLD, PETSC_COMM_SELF, &viewer));
+  PetscCall(PetscViewerASCIIPrintf(viewer, "\nLocal Vector: processor %d\n", rank));
   PetscCall(VecView(local, viewer));
   PetscCall(PetscViewerRestoreSubViewer(PETSC_VIEWER_STDOUT_WORLD, PETSC_COMM_SELF, &viewer));
-  PetscCall(PetscViewerFlush(PETSC_VIEWER_STDOUT_WORLD));
   PetscCall(PetscViewerASCIIPopSynchronized(PETSC_VIEWER_STDOUT_WORLD));
 
   /* Test LocalToGlobal in insert mode */
@@ -63,11 +69,10 @@ int main(int argc, char **argv)
   PetscCall(DMLocalToLocalEnd(packer, local, INSERT_VALUES, buffer));
 
   PetscCall(PetscViewerASCIIPushSynchronized(PETSC_VIEWER_STDOUT_WORLD));
-  PetscCall(PetscViewerASCIISynchronizedPrintf(PETSC_VIEWER_STDOUT_WORLD, "\nLocal Vector: processor %d\n", rank));
   PetscCall(PetscViewerGetSubViewer(PETSC_VIEWER_STDOUT_WORLD, PETSC_COMM_SELF, &viewer));
+  PetscCall(PetscViewerASCIIPrintf(viewer, "\nLocal Vector: processor %d\n", rank));
   PetscCall(VecView(buffer, viewer));
   PetscCall(PetscViewerRestoreSubViewer(PETSC_VIEWER_STDOUT_WORLD, PETSC_COMM_SELF, &viewer));
-  PetscCall(PetscViewerFlush(PETSC_VIEWER_STDOUT_WORLD));
   PetscCall(PetscViewerASCIIPopSynchronized(PETSC_VIEWER_STDOUT_WORLD));
 
   PetscCall(VecDestroy(&buffer));

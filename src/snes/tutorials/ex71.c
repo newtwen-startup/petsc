@@ -319,14 +319,14 @@ int main(int argc, char **argv)
   PetscCall(DMCreateGlobalVector(dm, &u));
   PetscCall(VecDuplicate(u, &r));
 
-  PetscCall(DMPlexSetSNESLocalFEM(dm, &user, &user, &user));
+  PetscCall(DMPlexSetSNESLocalFEM(dm, PETSC_FALSE, &user));
 
   PetscCall(SNESSetFromOptions(snes));
 
   {
-    PetscDS              ds;
-    PetscSimplePointFunc exactFuncs[2];
-    void                *ctxs[2];
+    PetscDS             ds;
+    PetscSimplePointFn *exactFuncs[2];
+    void               *ctxs[2];
 
     PetscCall(DMGetDS(dm, &ds));
     PetscCall(PetscDSGetExactSolution(ds, 0, &exactFuncs[0], &ctxs[0]));

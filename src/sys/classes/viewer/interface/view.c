@@ -92,13 +92,13 @@ PetscErrorCode PetscViewerDestroy(PetscViewer *viewer)
   PetscValidHeaderSpecific(*viewer, PETSC_VIEWER_CLASSID, 1);
 
   PetscCall(PetscViewerFlush(*viewer));
-  if (--((PetscObject)(*viewer))->refct > 0) {
+  if (--((PetscObject)*viewer)->refct > 0) {
     *viewer = NULL;
     PetscFunctionReturn(PETSC_SUCCESS);
   }
 
   PetscCall(PetscObjectSAWsViewOff((PetscObject)*viewer));
-  if ((*viewer)->ops->destroy) PetscCall((*(*viewer)->ops->destroy)(*viewer));
+  PetscTryTypeMethod(*viewer, destroy);
   PetscCall(PetscHeaderDestroy(viewer));
   PetscFunctionReturn(PETSC_SUCCESS);
 }
@@ -133,7 +133,7 @@ PetscErrorCode PetscViewerDestroy(PetscViewer *viewer)
 PetscErrorCode PetscViewerAndFormatCreate(PetscViewer viewer, PetscViewerFormat format, PetscViewerAndFormat **vf)
 {
   PetscFunctionBegin;
-  PetscCall(PetscObjectReference((PetscObject)viewer));
+  if (!((PetscObject)viewer)->persistent) PetscCall(PetscObjectReference((PetscObject)viewer));
   PetscCall(PetscNew(vf));
   (*vf)->viewer = viewer;
   (*vf)->format = format;
@@ -158,7 +158,7 @@ PetscErrorCode PetscViewerAndFormatCreate(PetscViewer viewer, PetscViewerFormat 
 PetscErrorCode PetscViewerAndFormatDestroy(PetscViewerAndFormat **vf)
 {
   PetscFunctionBegin;
-  PetscCall(PetscViewerDestroy(&(*vf)->viewer));
+  if (!((PetscObject)((*vf)->viewer))->persistent) PetscCall(PetscViewerDestroy(&(*vf)->viewer));
   PetscCall(PetscDrawLGDestroy(&(*vf)->lg));
   PetscCall(PetscFree(*vf));
   PetscFunctionReturn(PETSC_SUCCESS);
@@ -411,13 +411,13 @@ PetscErrorCode PetscViewerRead(PetscViewer viewer, void *data, PetscInt num, Pet
       for (c = 0; c < num; c++) {
         /* Skip leading whitespaces */
         do {
-          PetscCall((*viewer->ops->read)(viewer, &(s[i]), 1, &cnt, PETSC_CHAR));
+          PetscUseTypeMethod(viewer, read, &s[i], 1, &cnt, PETSC_CHAR);
           if (!cnt) break;
         } while (s[i] == '\n' || s[i] == '\t' || s[i] == ' ' || s[i] == '\0' || s[i] == '\v' || s[i] == '\f' || s[i] == '\r');
         i++;
         /* Read strings one char at a time */
         do {
-          PetscCall((*viewer->ops->read)(viewer, &(s[i++]), 1, &cnt, PETSC_CHAR));
+          PetscUseTypeMethod(viewer, read, &s[i++], 1, &cnt, PETSC_CHAR);
           if (!cnt) break;
         } while (s[i - 1] != '\n' && s[i - 1] != '\t' && s[i - 1] != ' ' && s[i - 1] != '\0' && s[i - 1] != '\v' && s[i - 1] != '\f' && s[i - 1] != '\r');
         /* Terminate final string */
@@ -426,7 +426,7 @@ PetscErrorCode PetscViewerRead(PetscViewer viewer, void *data, PetscInt num, Pet
     } else {
       /* Read until a \n is encountered (-num is the max size allowed) */
       do {
-        PetscCall((*viewer->ops->read)(viewer, &(s[i++]), 1, &cnt, PETSC_CHAR));
+        PetscUseTypeMethod(viewer, read, &s[i++], 1, &cnt, PETSC_CHAR);
         if (i == -num || !cnt) break;
       } while (s[i - 1] != '\n');
       /* Terminate final string */

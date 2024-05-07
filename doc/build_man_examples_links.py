@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 """ Adds links in the manual pages to tutorials that utilize the functions"""
 
 import os
@@ -30,9 +30,13 @@ def loadmanualpagescit(petsc_dir):
   for line in  text.split():
     m = re.match(PATTERN, line)
     # print('Manual page '+m.group(1)+' location '+m.group(3))
+    if not m:
+      raise RuntimeError('Cannot find PATTERN '+str(PATTERN)+' in manualpages.cit line '+line)
     if re.match(EXCLUDE_PATTERN,m.group(1)): continue
-    mdict[' '+m.group(1)+' '] = m.group(3)
-    mdict['\('+m.group(1)+'\('] = m.group(3)
+    mdict[r' '+m.group(1)+r' '] = m.group(3)
+    mdict[r' '+m.group(1)+r'\)'] = m.group(3)
+    mdict[r' '+m.group(1)+r','] = m.group(3)
+    mdict[r'\('+m.group(1)+r'\('] = m.group(3)
   # sort to find enclosing names first
   mdict = dict(sorted(mdict.items(), key=lambda item: len(item[0]), reverse = True))
   keyre = re.compile('|'.join(list(mdict.keys())))
@@ -50,6 +54,7 @@ def main(petsc_dir):
       if len(uses[i[1:-1]]) > 0:
         manpage = os.path.join(petsc_dir,'doc','manualpages',mdict[i])
         set_uses = set(uses[i[1:-1]])
+        uses[i[1:-1]] = []
         with open(manpage,'a') as fd:
           fd.write('\n## Examples\n')
           for j in set_uses:

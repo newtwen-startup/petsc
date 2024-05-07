@@ -252,16 +252,16 @@ PetscErrorCode PetscSpaceDestroy(PetscSpace *sp)
 {
   PetscFunctionBegin;
   if (!*sp) PetscFunctionReturn(PETSC_SUCCESS);
-  PetscValidHeaderSpecific((*sp), PETSCSPACE_CLASSID, 1);
+  PetscValidHeaderSpecific(*sp, PETSCSPACE_CLASSID, 1);
 
-  if (--((PetscObject)(*sp))->refct > 0) {
+  if (--((PetscObject)*sp)->refct > 0) {
     *sp = NULL;
     PetscFunctionReturn(PETSC_SUCCESS);
   }
-  ((PetscObject)(*sp))->refct = 0;
+  ((PetscObject)*sp)->refct = 0;
   PetscCall(DMDestroy(&(*sp)->dm));
 
-  PetscCall((*(*sp)->ops->destroy)(*sp));
+  PetscUseTypeMethod(*sp, destroy);
   PetscCall(PetscHeaderDestroy(sp));
   PetscFunctionReturn(PETSC_SUCCESS);
 }
@@ -468,14 +468,14 @@ PetscErrorCode PetscSpaceGetNumVariables(PetscSpace sp, PetscInt *n)
 - points  - The point coordinates
 
   Output Parameters:
-+ B - The function evaluations in a npoints x nfuncs array
-. D - The derivative evaluations in a npoints x nfuncs x dim array
-- H - The second derivative evaluations in a npoints x nfuncs x dim x dim array
++ B - The function evaluations in a `npoints` x `nfuncs` array
+. D - The derivative evaluations in a `npoints` x `nfuncs` x `dim` array
+- H - The second derivative evaluations in a `npoints` x `nfuncs` x `dim` x `dim` array
 
   Level: beginner
 
   Note:
-  Above nfuncs is the dimension of the space, and dim is the spatial dimension. The coordinates are given
+  Above `nfuncs` is the dimension of the space, and `dim` is the spatial dimension. The coordinates are given
   on the reference cell, not in real space.
 
 .seealso: `PetscSpace`, `PetscFECreateTabulation()`, `PetscFEGetCellTabulation()`, `PetscSpaceCreate()`

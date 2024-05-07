@@ -43,14 +43,14 @@ public:
 
 int main(int argc, char **argv)
 {
-  Mat            A, B, P, R;
-  PetscInt       m = 100, dim = 3, M, begin = 0;
-  PetscMPIInt    size;
-  PetscReal     *coords, *gcoords, norm, epsilon, relative;
-  PetscBool      sym = PETSC_FALSE;
-  PetscRandom    rdm;
-  MatHtoolKernel kernel = GenEntries;
-  MyIMatrix     *imatrix;
+  Mat               A, B, P, R;
+  PetscInt          m = 100, dim = 3, M, begin = 0;
+  PetscMPIInt       size;
+  PetscReal        *coords, *gcoords, norm, epsilon, relative;
+  PetscBool         sym = PETSC_FALSE;
+  PetscRandom       rdm;
+  MatHtoolKernelFn *kernel = GenEntries;
+  MyIMatrix        *imatrix;
 
   PetscFunctionBeginUser;
   PetscCall(PetscInitialize(&argc, &argv, (char *)NULL, help));
@@ -105,9 +105,7 @@ int main(int argc, char **argv)
       requires: htool
    test:
       requires: htool
-      suffix: 2
       nsize: 4
       args: -m_local 120 -mat_htool_epsilon 1.0e-2 -symmetric {{false true}shared output}
-      output_file: output/ex101.out
 
 TEST*/

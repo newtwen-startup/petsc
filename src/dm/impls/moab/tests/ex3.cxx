@@ -46,7 +46,7 @@ PetscErrorCode ProcessOptions(MPI_Comm comm, AppCtx *options)
 
   PetscCall(PetscLogEventRegister("CreateMesh", DM_CLASSID, &options->createMeshEvent));
   PetscFunctionReturn(PETSC_SUCCESS);
-};
+}
 
 PetscErrorCode CreateMesh(MPI_Comm comm, AppCtx *user)
 {
@@ -146,7 +146,7 @@ int main(int argc, char **argv)
 /*TEST
 
      build:
-       requires: moab
+       requires: moab !complex
 
      test:
        args: -debug -n 2 -dim 2 -levels 2 -simplex

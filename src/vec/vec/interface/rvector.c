@@ -2,8 +2,6 @@
      Provides the interface functions for vector operations that have PetscScalar/PetscReal in the signature
    These are the vector functions the user calls.
 */
-#include "petsc/private/sfimpl.h"
-#include "petscsystypes.h"
 #include <petsc/private/vecimpl.h> /*I  "petscvec.h"   I*/
 
 PetscInt VecGetSubVectorSavedStateId = -1;
@@ -212,7 +210,14 @@ PetscErrorCode VecNorm(Vec x, NormType type, PetscReal *val)
     b1[0]          = -b0;
     b1[1]          = b0;
     PetscCall(MPIU_Allreduce(b1, b2, 2, MPI_INT, MPI_MAX, PetscObjectComm((PetscObject)x)));
-    PetscCheck(-b2[0] == b2[1], PetscObjectComm((PetscObject)x), PETSC_ERR_ARG_WRONGSTATE, "Some MPI processes have cached norm, others do not. This may happen when some MPI processes call VecGetArray() and some others do not.");
+    PetscCheck(-b2[0] == b2[1], PetscObjectComm((PetscObject)x), PETSC_ERR_ARG_WRONGSTATE, "Some MPI processes have cached %s norm, others do not. This may happen when some MPI processes call VecGetArray() and some others do not.", NormTypes[type]);
+    if (flg) {
+      PetscReal b1[2], b2[2];
+      b1[0] = -(*val);
+      b1[1] = *val;
+      PetscCall(MPIU_Allreduce(b1, b2, 2, MPIU_REAL, MPIU_MAX, PetscObjectComm((PetscObject)x)));
+      PetscCheck(-b2[0] == b2[1], PETSC_COMM_SELF, PETSC_ERR_ARG_WRONGSTATE, "Difference in cached %s norms: local %g", NormTypes[type], (double)*val);
+    }
   }
   if (flg) PetscFunctionReturn(PETSC_SUCCESS);
 
@@ -438,6 +443,7 @@ PetscErrorCode VecScaleAsync_Private(Vec x, PetscScalar alpha, PetscDeviceContex
   PetscValidType(x, 1);
   VecCheckAssembled(x);
   PetscCall(VecSetErrorIfLocked(x, 1));
+  PetscValidLogicalCollectiveScalar(x, alpha, 2);
   if (alpha == one) PetscFunctionReturn(PETSC_SUCCESS);
 
   /* get current stashed norms */
@@ -459,7 +465,7 @@ PetscErrorCode VecScaleAsync_Private(Vec x, PetscScalar alpha, PetscDeviceContex
 /*@
   VecScale - Scales a vector.
 
-  Not Collective
+  Logically Collective
 
   Input Parameters:
 + x     - the vector
@@ -501,13 +507,12 @@ PetscErrorCode VecSetAsync_Private(Vec x, PetscScalar alpha, PetscDeviceContext 
   PetscCall(PetscObjectStateIncrease((PetscObject)x));
 
   /*  norms can be simply set (if |alpha|*N not too large) */
-
   {
     PetscReal      val = PetscAbsScalar(alpha);
     const PetscInt N   = x->map->N;
 
     if (N == 0) {
-      PetscCall(PetscObjectComposedDataSetReal((PetscObject)x, NormIds[NORM_1], 0.0l));
+      PetscCall(PetscObjectComposedDataSetReal((PetscObject)x, NormIds[NORM_1], 0.0));
       PetscCall(PetscObjectComposedDataSetReal((PetscObject)x, NormIds[NORM_INFINITY], 0.0));
       PetscCall(PetscObjectComposedDataSetReal((PetscObject)x, NormIds[NORM_2], 0.0));
       PetscCall(PetscObjectComposedDataSetReal((PetscObject)x, NormIds[NORM_FROBENIUS], 0.0));
@@ -701,6 +706,7 @@ PetscErrorCode VecAXPBYAsync_Private(Vec y, PetscScalar alpha, PetscScalar beta,
   PetscCall(VecLockReadPop(x));
   PetscFunctionReturn(PETSC_SUCCESS);
 }
+
 /*@
   VecAXPBY - Computes `y = alpha x + beta y`.
 
@@ -1397,7 +1403,7 @@ PetscErrorCode VecConcatenate(PetscInt nx, const Vec X[], Vec *Y, IS *x_is[])
     PetscCall((*(*X)->ops->concatenate)(nx, X, Y, x_is));
   } else {
     /* loop over vectors and start creating IS */
-    comm = PetscObjectComm((PetscObject)(*X));
+    comm = PetscObjectComm((PetscObject)*X);
     PetscCall(VecGetType(*X, &vec_type));
     PetscCall(PetscMalloc1(nx, &is_tmp));
     for (i = 0; i < nx; i++) {
@@ -1519,10 +1525,12 @@ PetscErrorCode VecGetSubVectorThroughVecScatter_Private(Vec X, IS is, PetscInt b
 
   Notes:
   The subvector `Y` should be returned with `VecRestoreSubVector()`.
-  `X` and must be defined on the same communicator
+  `X` and `is` must be defined on the same communicator
+
+  Changes to the subvector will be reflected in the `X` vector on the call to `VecRestoreSubVector()`.
 
   This function may return a subvector without making a copy, therefore it is not safe to use the original vector while
-  modifying the subvector.  Other non-overlapping subvectors can still be obtained from X using this function.
+  modifying the subvector.  Other non-overlapping subvectors can still be obtained from `X` using this function.
 
   The resulting subvector inherits the block size from `is` if greater than one. Otherwise, the block size is guessed from the block size of the original `X`.
 
@@ -1610,7 +1618,7 @@ PetscErrorCode VecGetSubVector(Vec X, IS is, Vec *Y)
         PetscCall(VecSetType(Z, ((PetscObject)X)->type_name));
         PetscCall(VecSetSizes(Z, n, N));
         PetscCall(VecSetBlockSize(Z, bs));
-        PetscCall(VecPlaceArray(Z, x ? x + start : NULL));
+        PetscCall(VecPlaceArray(Z, PetscSafePointerPlusOffset(x, start)));
         PetscCall(VecRestoreArrayRead(X, &x));
       }
 
@@ -3139,7 +3147,7 @@ PetscErrorCode VecGetArray3d(Vec x, PetscInt m, PetscInt n, PetscInt p, PetscInt
   b = (PetscScalar **)((*a) + m);
   for (i = 0; i < m; i++) (*a)[i] = b + i * n - nstart;
   for (i = 0; i < m; i++)
-    for (j = 0; j < n; j++) b[i * n + j] = aa + i * n * p + j * p - pstart;
+    for (j = 0; j < n; j++) b[i * n + j] = PetscSafePointerPlusOffset(aa, i * n * p + j * p - pstart);
   *a -= mstart;
   PetscFunctionReturn(PETSC_SUCCESS);
 }
@@ -3723,7 +3731,7 @@ PetscErrorCode VecGetArray3dRead(Vec x, PetscInt m, PetscInt n, PetscInt p, Pets
   b = (PetscScalar **)((*a) + m);
   for (i = 0; i < m; i++) (*a)[i] = b + i * n - nstart;
   for (i = 0; i < m; i++)
-    for (j = 0; j < n; j++) b[i * n + j] = (PetscScalar *)aa + i * n * p + j * p - pstart;
+    for (j = 0; j < n; j++) b[i * n + j] = PetscSafePointerPlusOffset((PetscScalar *)aa, i * n * p + j * p - pstart);
   *a -= mstart;
   PetscFunctionReturn(PETSC_SUCCESS);
 }

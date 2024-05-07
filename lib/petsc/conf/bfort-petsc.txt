@@ -6,6 +6,9 @@ nativeptr AO
 # petscbag.h
 nativeptr PetscBag
 
+# petscdt.h
+native    PetscDTNodeType
+
 # petscdm.h
 native    DMBoundaryType
 native    DMPointLocationType
@@ -17,6 +20,7 @@ native    DMDirection
 native    DMEnclosureType
 native    DMPolytopeType
 native    DMCopyLabelsMode
+native    DMReorderDefaultFlag
 
 nativeptr DM
 
@@ -53,7 +57,6 @@ nativeptr DMNetworkMonitor
 # dmplex.h
 native    DMPlexInterpolatedFlag
 native    DMPlexTPSType
-native    DMPlexReorderDefaultFlag
 
 # dmswarm.h
 native    DMSwarmType
@@ -239,6 +242,7 @@ native    PetscLogDouble
 
 nativeptr PetscMatlabEngine
 nativeptr PetscRandom
+nativeptr PetscBench
 native    PetscBinarySeekType
 
 native    PetscBuildTwoSidedType
@@ -288,4 +292,3 @@ nativeptr PetscViewerAndFormat
 nativeptr PetscViewers
 native    PetscFileMode
 native    PetscViewerFormat
-

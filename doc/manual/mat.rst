@@ -154,6 +154,12 @@ informs the user that all rows from ``first_row`` to ``last_row-1``
 (since the value returned in ``last_row`` is one more than the global
 index of the last local row) will be stored on the local process.
 
+If the `Mat` was obtained from a `DM` with `DMCreateMatrix()`, then the range values are determined by the specific `DM`.
+If the `Mat` was created directly, the range values are determined by the local sizes passed to `MatSetSizes()` or `MatCreateAIJ()` (and such low-level functions for other `MatType`).
+If `PETSC_DECIDE` was passed as the local size, then the vector uses default values for the range using `PetscSplitOwnership()`.
+For certain `DM`, such as `DMDA`, it is better to use `DM` specific routines, such as `DMDAGetGhostCorners()`, to determine
+the local values in the matrix. See :any:`sec_matlayout` for full details on row and column layouts.
+
 In the sparse matrix implementations, once the assembly routines have
 been called, the matrices are compressed and can be used for
 matrix-vector multiplication, etc. Any space for preallocated nonzeros
@@ -1108,14 +1114,14 @@ or equivalently,
 
 Note that with all of these for a given assembled matrix it can be only
 called once to update the x and b vector. It cannot be used if one
-wishes to solve multiple right hand side problems for the same matrix
+wishes to solve multiple right-hand side problems for the same matrix
 since the matrix entries needed for updating the b vector are removed in
 its first use.
 
 Once the zeroed rows are removed the new matrix has possibly many rows
 with only a diagonal entry affecting the parallel load balancing. The
 ``PCREDISTRIBUTE`` preconditioner removes all the zeroed rows (and
-associated columns and adjusts the right hand side based on the removed
+associated columns and adjusts the right-hand side based on the removed
 columns) and then rebalances the resulting rows of smaller matrix across
 the processes. Thus one can use ``MatZeroRows()`` to set the Dirichlet
 points and then solve with the preconditioner ``PCREDISTRIBUTE``. Note

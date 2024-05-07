@@ -4,22 +4,19 @@ import os
 class Configure(config.package.GNUPackage):
   def __init__(self, framework):
     config.package.GNUPackage.__init__(self, framework)
-    self.version         = '2.29.0'
+    self.version         = '2.31.0'
     self.minversion      = '2.14'
     self.versionname     = 'HYPRE_RELEASE_VERSION'
     self.versioninclude  = 'HYPRE_config.h'
     self.requiresversion = 1
-    self.gitcommit       = 'v'+self.version
-    # self.gitcommit       = '5e0bf05b42d856022d0a4d5c9294dfbe64cd5675' # master, june-20-2023
+    #self.gitcommit       = 'v'+self.version
+    self.gitcommit       = 'ee74c20e7a84e4e48eec142c6bb6ff2a75db72f1' # master feb-16-2024 (2.31.0+recursive-make-fix)
     self.download        = ['git://https://github.com/hypre-space/hypre','https://github.com/hypre-space/hypre/archive/'+self.gitcommit+'.tar.gz']
     self.functions       = ['HYPRE_IJMatrixCreate']
     self.includes        = ['HYPRE.h']
     self.liblist         = [['libHYPRE.a']]
     self.buildLanguages  = ['C','Cxx']
-    # Per hypre users guide section 7.5 - install manually on windows for MS compilers.
-    self.precisions        = ['double']
-    # HYPRE is supposed to work with complex number
-    #self.complex           = 0
+    self.precisions        = ['single', 'double', '__float128']
     self.hastests          = 1
     self.hastestsdatafiles = 1
 
@@ -75,6 +72,12 @@ class Configure(config.package.GNUPackage):
     args.append('--with-blas=no')
     args.append('--with-lapack=no')
 
+    # floating point precisions
+    if self.scalar.precision == 'single':
+      args.append('--enable-single')
+    elif self.scalar.precision == '__float128':
+      args.append('--enable-longdouble')
+
     # HYPRE automatically detects essl symbols and includes essl.h!
     # There are no configure options to disable it programmatically
     if hasattr(self.blasLapack,'essl'):
@@ -90,6 +93,7 @@ class Configure(config.package.GNUPackage):
     if self.hip.found:
       stdflag  = '-std=c++14'
       hipbuild = True
+      args.append('ROCM_PATH="{0}"'.format(self.hip.hipDir))
       args.append('--with-hip')
       if not hasharch:
         if not 'with-hypre-gpu-arch' in self.framework.clArgDB:

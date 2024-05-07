@@ -18,7 +18,7 @@
 !    User-defined context that contains all the data structures used
 !    in the linear solution process.
 
-!   Vec    x,b      /* solution vector, right hand side vector and work vector */
+!   Vec    x,b      /* solution vector, right-hand side vector and work vector */
 !   Mat    A        /* sparse matrix */
 !   KSP   ksp     /* linear solver context */
 !   int    m,n      /* grid dimensions */
@@ -93,7 +93,7 @@
        ALLOCATE (rho(m,n))
 
 !  Fill up the array rho[] with the function rho(x,y) = x; fill the
-!  right-hand-side b[] and the solution with a known problem for testing.
+!  right-hand side b and the solution with a known problem for testing.
 
       hx = 1.0/real(m+1)
       hy = 1.0/real(n+1)
@@ -194,7 +194,6 @@
       userctx%m = m
       userctx%n = n
 
-      return
       end
 ! -----------------------------------------------------------------------
 
@@ -322,7 +321,6 @@
 
       PetscCall(VecResetArray(x,ierr))
       PetscCall(VecResetArray(b,ierr))
-      return
       end
 
 ! ------------------------------------------------------------------------
@@ -343,7 +341,6 @@
       PetscCall(VecDestroy(userctx%b,ierr))
       PetscCall(MatDestroy(userctx%A,ierr))
       PetscCall(KSPDestroy(userctx%ksp,ierr))
-      return
       end
 
 !

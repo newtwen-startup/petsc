@@ -119,7 +119,7 @@ PetscErrorCode ComputeRHS(KSP ksp, Vec b, void *ctx)
   PetscCall(VecAssemblyBegin(b));
   PetscCall(VecAssemblyEnd(b));
 
-  /* force right hand side to be consistent for singular matrix */
+  /* force right-hand side to be consistent for singular matrix */
   /* note this is really a hack, normally the model would provide you with a consistent right handside */
   if (user->bcType == NEUMANN) {
     MatNullSpace nullspace;
@@ -301,7 +301,7 @@ PetscErrorCode ComputeMatrix(KSP ksp, Mat J, Mat jac, void *ctx)
       suffix: 5
       nsize: 2
       requires: hypre !complex
-      args: -pc_type mg  -da_refine 2 -ksp_monitor  -matptap_via hypre -pc_mg_galerkin both
+      args: -pc_type mg -da_refine 2 -ksp_monitor -matptap_via hypre -pc_mg_galerkin both
 
    test:
       suffix: 6

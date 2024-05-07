@@ -7,12 +7,9 @@ Here we discuss details about Python-aware PETSc types that can be used within t
 
 In particular, we discuss matrices, preconditioners, Krylov solvers, nonlinear solvers and ODE integrators.
 
-The low-level, Cython implementation exposing the Python methods is contained in
+The low-level, Cython implementation exposing the Python methods is in `src/petsc4py/PETSc/libpetsc4py.pyx <https://gitlab.com/petsc/petsc/-/tree/release/src/binding/petsc4py/src/petsc4py/PETSc/libpetsc4py.pyx>`_.
 
-:file:`${PETSC_DIR}/src/binding/petsc4py/src/petsc4py/PETSc/libpetsc4py.pyx`
-
-The scripts can be found in
-:file:`${PETSC_DIR}/src/binding/petsc4py/demo/python_types`.
+The scripts used here can be found at `demo/python_types <https://gitlab.com/petsc/petsc/-/tree/release/src/binding/petsc4py/demo/python_types>`_.
 
 .. _petsc_python_mat:
 
@@ -59,7 +56,7 @@ arguments to specify that our preconditioner should be used:
   KSP Object: 1 MPI process
     type: cg
     maximum iterations=10000, initial guess is zero
-    tolerances:  relative=1e-05, absolute=1e-50, divergence=10000.
+    tolerances: relative=1e-05, absolute=1e-50, divergence=10000.
     left preconditioning
     using PRECONDITIONED norm type for convergence test
   PC Object: 1 MPI process

@@ -133,7 +133,7 @@ typedef struct {
   to check the min/max limits on the state variable VR. A non windup limiter is used for
   the VR limits.
 */
-PetscErrorCode EventFunction(TS ts, PetscReal t, Vec X, PetscScalar *fvalue, void *ctx)
+PetscErrorCode EventFunction(TS ts, PetscReal t, Vec X, PetscReal *fvalue, void *ctx)
 {
   Userctx           *user = (Userctx *)ctx;
   Vec                Xgen, Xnet;
@@ -142,7 +142,6 @@ PetscErrorCode EventFunction(TS ts, PetscReal t, Vec X, PetscScalar *fvalue, voi
   PetscScalar        Efd, RF, VR, Vr, Vi, Vm;
 
   PetscFunctionBegin;
-
   PetscCall(DMCompositeGetLocalVectors(user->dmpgrid, &Xgen, &Xnet));
   PetscCall(DMCompositeScatter(user->dmpgrid, X, Xgen, Xnet));
 
@@ -164,14 +163,14 @@ PetscErrorCode EventFunction(TS ts, PetscReal t, Vec X, PetscScalar *fvalue, voi
     Vm = PetscSqrtScalar(Vr * Vr + Vi * Vi);
 
     if (!VRatmax[i]) {
-      fvalue[2 + 2 * i] = VRMAX[i] - VR;
+      fvalue[2 + 2 * i] = PetscRealPart(VRMAX[i] - VR);
     } else {
-      fvalue[2 + 2 * i] = (VR - KA[i] * RF + KA[i] * KF[i] * Efd / TF[i] - KA[i] * (Vref[i] - Vm)) / TA[i];
+      fvalue[2 + 2 * i] = PetscRealPart((VR - KA[i] * RF + KA[i] * KF[i] * Efd / TF[i] - KA[i] * (Vref[i] - Vm)) / TA[i]);
     }
     if (!VRatmin[i]) {
-      fvalue[2 + 2 * i + 1] = VRMIN[i] - VR;
+      fvalue[2 + 2 * i + 1] = PetscRealPart(VRMIN[i] - VR);
     } else {
-      fvalue[2 + 2 * i + 1] = (VR - KA[i] * RF + KA[i] * KF[i] * Efd / TF[i] - KA[i] * (Vref[i] - Vm)) / TA[i];
+      fvalue[2 + 2 * i + 1] = PetscRealPart((VR - KA[i] * RF + KA[i] * KF[i] * Efd / TF[i] - KA[i] * (Vref[i] - Vm)) / TA[i]);
     }
     idx = idx + 9;
   }
@@ -179,7 +178,6 @@ PetscErrorCode EventFunction(TS ts, PetscReal t, Vec X, PetscScalar *fvalue, voi
   PetscCall(VecRestoreArrayRead(Xnet, &xnet));
 
   PetscCall(DMCompositeRestoreLocalVectors(user->dmpgrid, &Xgen, &Xnet));
-
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
@@ -196,7 +194,6 @@ PetscErrorCode PostEventFunction(TS ts, PetscInt nevents, PetscInt event_list[],
   PetscScalar  Vr, Vi, Vm;
 
   PetscFunctionBegin;
-
   PetscCall(DMCompositeGetLocalVectors(user->dmpgrid, &Xgen, &Xnet));
   PetscCall(DMCompositeScatter(user->dmpgrid, X, Xgen, Xnet));
 
@@ -293,7 +290,6 @@ PetscErrorCode PostEventFunction(TS ts, PetscInt nevents, PetscInt event_list[],
   PetscCall(VecRestoreArray(Xnet, &xnet));
 
   PetscCall(DMCompositeRestoreLocalVectors(user->dmpgrid, &Xgen, &Xnet));
-
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
@@ -1015,7 +1011,6 @@ PetscErrorCode RHSJacobian(TS ts, PetscReal t, Vec X, Mat A, Mat B, void *ctx)
   user->t = t;
 
   PetscCall(ResidualJacobian(X, A, B, user));
-
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
@@ -1176,8 +1171,8 @@ int main(int argc, char **argv)
   } else {
     PetscCall(TSSetType(ts, TSCN));
     PetscCall(TSSetEquationType(ts, TS_EQ_DAE_IMPLICIT_INDEX1));
-    PetscCall(TSSetIFunction(ts, NULL, (TSIFunction)IFunction, &user));
-    PetscCall(TSSetIJacobian(ts, J, J, (TSIJacobian)IJacobian, &user));
+    PetscCall(TSSetIFunction(ts, NULL, (TSIFunctionFn *)IFunction, &user));
+    PetscCall(TSSetIJacobian(ts, J, J, (TSIJacobianFn *)IJacobian, &user));
   }
   PetscCall(TSSetApplicationContext(ts, &user));
 
@@ -1306,7 +1301,7 @@ int main(int argc, char **argv)
 
    test:
       suffix: semiexplicit
-      args: -ts_monitor -snes_monitor_short -dae_semiexplicit -ts_rk_type 2a
+      args: -ts_monitor -dae_semiexplicit -snes_error_if_not_converged -ts_rk_type 2a
       localrunfiles: petscoptions X.bin Ybus.bin
 
    test:

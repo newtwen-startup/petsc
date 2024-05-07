@@ -79,6 +79,8 @@ PetscSpinlock PetscViewerASCIISpinLockStderr;
 PetscSpinlock PetscCommSpinLock;
 #endif
 
+extern PetscInt PetscNumBLASThreads;
+
 /*@C
   PetscInitializeNoPointers - Calls PetscInitialize() from C/C++ without the pointers to argc and args
 
@@ -94,7 +96,7 @@ PetscSpinlock PetscCommSpinLock;
 
   Notes:
   this is called only by the PETSc Julia interface. Even though it might start MPI it sets the flag to
-  indicate that it did NOT start MPI so that the PetscFinalize() does not end MPI, thus allowing PetscInitialize() to
+  indicate that it did NOT start MPI so that the `PetscFinalize()` does not end MPI, thus allowing `PetscInitialize()` to
   be called multiple times from Julia without the problem of trying to initialize MPI more than once.
 
   Developer Notes:
@@ -349,7 +351,7 @@ PETSC_EXTERN void MPIAPI PetscMin_Local(void *in, void *out, PetscMPIInt *cnt, M
    Note: this is declared extern "C" because it is passed to MPI_Comm_create_keyval()
 
 */
-PETSC_EXTERN PetscMPIInt MPIAPI Petsc_Counter_Attr_Delete_Fn(MPI_Comm comm, PetscMPIInt keyval, void *count_val, void *extra_state)
+PETSC_EXTERN PetscMPIInt MPIAPI Petsc_Counter_Attr_DeleteFn(MPI_Comm comm, PetscMPIInt keyval, void *count_val, void *extra_state)
 {
   PetscCommCounter      *counter = (PetscCommCounter *)count_val;
   struct PetscCommStash *comms   = counter->comms, *pcomm;
@@ -378,7 +380,7 @@ PETSC_EXTERN PetscMPIInt MPIAPI Petsc_Counter_Attr_Delete_Fn(MPI_Comm comm, Pets
   Note: this is declared extern "C" because it is passed to MPI_Comm_create_keyval()
 
 */
-PETSC_EXTERN PetscMPIInt MPIAPI Petsc_InnerComm_Attr_Delete_Fn(MPI_Comm comm, PetscMPIInt keyval, void *attr_val, void *extra_state)
+PETSC_EXTERN PetscMPIInt MPIAPI Petsc_InnerComm_Attr_DeleteFn(MPI_Comm comm, PetscMPIInt keyval, void *attr_val, void *extra_state)
 {
   union
   {
@@ -407,16 +409,16 @@ PETSC_EXTERN PetscMPIInt MPIAPI Petsc_InnerComm_Attr_Delete_Fn(MPI_Comm comm, Pe
 }
 
 /*
- * This is invoked on the inner comm when Petsc_InnerComm_Attr_Delete_Fn calls MPI_Comm_delete_attr().  It should not be reached any other way.
+ * This is invoked on the inner comm when Petsc_InnerComm_Attr_DeleteFn calls MPI_Comm_delete_attr().  It should not be reached any other way.
  */
-PETSC_EXTERN PetscMPIInt MPIAPI Petsc_OuterComm_Attr_Delete_Fn(MPI_Comm comm, PetscMPIInt keyval, void *attr_val, void *extra_state)
+PETSC_EXTERN PetscMPIInt MPIAPI Petsc_OuterComm_Attr_DeleteFn(MPI_Comm comm, PetscMPIInt keyval, void *attr_val, void *extra_state)
 {
   PetscFunctionBegin;
   PetscCallMPI(PetscInfo(NULL, "Removing reference to PETSc communicator embedded in a user MPI_Comm %ld\n", (long)comm));
   PetscFunctionReturn(MPI_SUCCESS);
 }
 
-PETSC_EXTERN PetscMPIInt MPIAPI Petsc_ShmComm_Attr_Delete_Fn(MPI_Comm, PetscMPIInt, void *, void *);
+PETSC_EXTERN PetscMPIInt MPIAPI Petsc_ShmComm_Attr_DeleteFn(MPI_Comm, PetscMPIInt, void *, void *);
 
 #if defined(PETSC_USE_PETSC_MPI_EXTERNAL32)
 PETSC_EXTERN PetscMPIInt PetscDataRep_extent_fn(MPI_Datatype, MPI_Aint *, void *);
@@ -446,10 +448,10 @@ PetscErrorCode PetscCitationsInitialize(void)
     and Jose~E. Roman and Karl Rupp and Patrick Sanan and Jason Sarich and Barry~F. Smith\n\
     and Stefano Zampini and Hong Zhang and Hong Zhang and Junchao Zhang},\n\
   Title = {{PETSc/TAO} Users Manual},\n\
-  Number = {ANL-21/39 - Revision 3.20},\n\
+  Number = {ANL-21/39 - Revision 3.21},\n\
   Doi = {10.2172/2205494},\n\
   Institution = {Argonne National Laboratory},\n\
-  Year = {2023}\n}\n",
+  Year = {2024}\n}\n",
                                    NULL));
 
   PetscCall(PetscCitationsRegister("@InProceedings{petsc-efficient,\n\
@@ -461,7 +463,6 @@ PetscErrorCode PetscCitationsInitialize(void)
   Publisher = {Birkh{\\\"{a}}user Press},\n\
   Year = {1997}\n}\n",
                                    NULL));
-
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
@@ -751,6 +752,7 @@ PETSC_INTERN PetscErrorCode PetscInitialize_Common(const char *prog, const char 
   PetscMPIInt size;
   PetscBool   flg = PETSC_TRUE;
   char        hostname[256];
+  PetscBool   blas_view_flag = PETSC_FALSE;
 
   PetscFunctionBegin;
   if (PetscInitializeCalled) PetscFunctionReturn(PETSC_SUCCESS);
@@ -965,10 +967,10 @@ PETSC_INTERN PetscErrorCode PetscInitialize_Common(const char *prog, const char 
   /*
      Attributes to be set on PETSc communicators
   */
-  PetscCallMPI(MPI_Comm_create_keyval(MPI_COMM_NULL_COPY_FN, Petsc_Counter_Attr_Delete_Fn, &Petsc_Counter_keyval, (void *)0));
-  PetscCallMPI(MPI_Comm_create_keyval(MPI_COMM_NULL_COPY_FN, Petsc_InnerComm_Attr_Delete_Fn, &Petsc_InnerComm_keyval, (void *)0));
-  PetscCallMPI(MPI_Comm_create_keyval(MPI_COMM_NULL_COPY_FN, Petsc_OuterComm_Attr_Delete_Fn, &Petsc_OuterComm_keyval, (void *)0));
-  PetscCallMPI(MPI_Comm_create_keyval(MPI_COMM_NULL_COPY_FN, Petsc_ShmComm_Attr_Delete_Fn, &Petsc_ShmComm_keyval, (void *)0));
+  PetscCallMPI(MPI_Comm_create_keyval(MPI_COMM_NULL_COPY_FN, Petsc_Counter_Attr_DeleteFn, &Petsc_Counter_keyval, (void *)0));
+  PetscCallMPI(MPI_Comm_create_keyval(MPI_COMM_NULL_COPY_FN, Petsc_InnerComm_Attr_DeleteFn, &Petsc_InnerComm_keyval, (void *)0));
+  PetscCallMPI(MPI_Comm_create_keyval(MPI_COMM_NULL_COPY_FN, Petsc_OuterComm_Attr_DeleteFn, &Petsc_OuterComm_keyval, (void *)0));
+  PetscCallMPI(MPI_Comm_create_keyval(MPI_COMM_NULL_COPY_FN, Petsc_ShmComm_Attr_DeleteFn, &Petsc_ShmComm_keyval, (void *)0));
   PetscCallMPI(MPI_Comm_create_keyval(MPI_COMM_NULL_COPY_FN, MPI_COMM_NULL_DELETE_FN, &Petsc_CreationIdx_keyval, (void *)0));
   PetscCallMPI(MPI_Comm_create_keyval(MPI_COMM_NULL_COPY_FN, MPI_COMM_NULL_DELETE_FN, &Petsc_Garbage_HMap_keyval, (void *)0));
 
@@ -1056,6 +1058,44 @@ PETSC_INTERN PetscErrorCode PetscInitialize_Common(const char *prog, const char 
   }
 #endif
 
+  PetscOptionsBegin(PETSC_COMM_WORLD, NULL, "BLAS options", "Sys");
+  PetscCall(PetscOptionsName("-blas_view", "Display number of threads to use for BLAS operations", NULL, &blas_view_flag));
+#if defined(PETSC_HAVE_BLI_THREAD_SET_NUM_THREADS) || defined(PETSC_HAVE_MKL_SET_NUM_THREADS) || defined(PETSC_HAVE_OPENBLAS_SET_NUM_THREADS)
+  {
+    char *threads = NULL;
+
+    /* determine any default number of threads requested in the environment; TODO: Apple libraries? */
+  #if defined(PETSC_HAVE_BLI_THREAD_SET_NUM_THREADS)
+    threads = getenv("BLIS_NUM_THREADS");
+    if (threads) PetscCall(PetscInfo(NULL, "BLAS: Environment number of BLIS threads %s given by BLIS_NUM_THREADS\n", threads));
+    if (!threads) {
+      threads = getenv("OMP_NUM_THREADS");
+      if (threads) PetscCall(PetscInfo(NULL, "BLAS: Environment number of BLIS threads %s given by OMP_NUM_THREADS\n", threads));
+    }
+  #elif defined(PETSC_HAVE_MKL_SET_NUM_THREADS)
+    threads = getenv("MKL_NUM_THREADS");
+    if (threads) PetscCall(PetscInfo(NULL, "BLAS: Environment number of MKL threads %s given by MKL_NUM_THREADS\n", threads));
+  #elif defined(PETSC_HAVE_OPENBLAS_SET_NUM_THREADS)
+    threads = getenv("OPENBLAS_NUM_THREADS");
+    if (threads) PetscCall(PetscInfo(NULL, "BLAS: Environment number of OpenBLAS threads %s given by OPENBLAS_NUM_THREADS\n", threads));
+    if (!threads) {
+      threads = getenv("OMP_NUM_THREADS");
+      if (threads) PetscCall(PetscInfo(NULL, "BLAS: Environment number of OpenBLAS threads %s given by OMP_NUM_THREADS\n", threads));
+    }
+  #endif
+    if (threads) (void)sscanf(threads, "%" PetscInt_FMT, &PetscNumBLASThreads);
+    PetscCall(PetscOptionsInt("-blas_num_threads", "Number of threads to use for BLAS operations", "None", PetscNumBLASThreads, &PetscNumBLASThreads, &flg));
+    PetscCall(PetscBLASSetNumThreads(PetscNumBLASThreads));
+    if (blas_view_flag) PetscCall(PetscPrintf(PETSC_COMM_WORLD, "BLAS: number of threads %" PetscInt_FMT "\n", PetscNumBLASThreads));
+  }
+#elif defined(PETSC_HAVE_APPLE_ACCELERATE)
+  PetscCall(PetscInfo(NULL, "BLAS: Apple Accelerate library, thread support with no user control\n"));
+  if (blas_view_flag) PetscCall(PetscPrintf(PETSC_COMM_WORLD, "BLAS: Apple Accelerate library, thread support with no user control\n"));
+#else
+  if (blas_view_flag) PetscCall(PetscPrintf(PETSC_COMM_WORLD, "BLAS: no thread support\n"));
+#endif
+  PetscOptionsEnd();
+
 #if defined(PETSC_USE_PETSC_MPI_EXTERNAL32)
   /*
       Tell MPI about our own data representation converter, this would/should be used if extern32 is not supported by the MPI
@@ -1075,7 +1115,7 @@ PETSC_INTERN PetscErrorCode PetscInitialize_Common(const char *prog, const char 
     PetscCall(PetscOptionsGetViewer(PETSC_COMM_WORLD, NULL, NULL, "-process_view", &viewer, NULL, &flg));
     if (flg) {
       PetscCall(PetscProcessPlacementView(viewer));
-      PetscCall(PetscViewerDestroy(&viewer));
+      PetscCall(PetscOptionsRestoreViewer(&viewer));
     }
   }
 #endif
@@ -1414,7 +1454,7 @@ PetscErrorCode PetscFinalize(void)
   PetscCall(PetscOptionsGetBool(NULL, NULL, "-x_virtual", &flg1, NULL));
   if (flg1) {
     /*  this is a crude hack, but better than nothing */
-    PetscCall(PetscPOpen(PETSC_COMM_WORLD, NULL, "pkill -9 Xvfb", "r", NULL));
+    PetscCall(PetscPOpen(PETSC_COMM_WORLD, NULL, "pkill -15 Xvfb", "r", NULL));
   }
 #endif
 
@@ -1471,13 +1511,7 @@ PetscErrorCode PetscFinalize(void)
   PetscCall(PetscOptionsHasName(NULL, NULL, "-objects_dump", &flg1));
   PetscCall(PetscOptionsGetBool(NULL, NULL, "-options_view", &flg2, NULL));
 
-  if (flg2) {
-    PetscViewer viewer;
-    PetscCall(PetscViewerCreate(PETSC_COMM_WORLD, &viewer));
-    PetscCall(PetscViewerSetType(viewer, PETSCVIEWERASCII));
-    PetscCall(PetscOptionsView(NULL, viewer));
-    PetscCall(PetscViewerDestroy(&viewer));
-  }
+  if (flg2) { PetscCall(PetscOptionsView(NULL, PETSC_VIEWER_STDOUT_WORLD)); }
 
   /* to prevent PETSc -options_left from warning */
   PetscCall(PetscOptionsHasName(NULL, NULL, "-nox", &flg1));
@@ -1488,11 +1522,7 @@ PetscErrorCode PetscFinalize(void)
   if (!flg1) flg3 = PETSC_TRUE;
   if (flg3) {
     if (!flg2 && flg1) { /* have not yet printed the options */
-      PetscViewer viewer;
-      PetscCall(PetscViewerCreate(PETSC_COMM_WORLD, &viewer));
-      PetscCall(PetscViewerSetType(viewer, PETSCVIEWERASCII));
-      PetscCall(PetscOptionsView(NULL, viewer));
-      PetscCall(PetscViewerDestroy(&viewer));
+      PetscCall(PetscOptionsView(NULL, PETSC_VIEWER_STDOUT_WORLD));
     }
     PetscCall(PetscOptionsAllUsed(NULL, &nopt));
     if (nopt) {
@@ -1619,9 +1649,8 @@ PetscErrorCode PetscFinalize(void)
   PetscGlobalArgs = NULL;
 
 #if defined(PETSC_HAVE_KOKKOS)
-  if (PetscBeganKokkos) {
+  if (PetscKokkosInitialized) {
     PetscCall(PetscKokkosFinalize_Private());
-    PetscBeganKokkos       = PETSC_FALSE;
     PetscKokkosInitialized = PETSC_FALSE;
   }
 #endif

@@ -199,7 +199,7 @@ static PetscErrorCode PetscPartitionerSetFromOptions_PTScotch(PetscPartitioner p
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
-static PetscErrorCode PetscPartitionerPartition_PTScotch(PetscPartitioner part, PetscInt nparts, PetscInt numVertices, PetscInt start[], PetscInt adjacency[], PetscSection vertSection, PetscSection targetSection, PetscSection partSection, IS *partition)
+static PetscErrorCode PetscPartitionerPartition_PTScotch(PetscPartitioner part, PetscInt nparts, PetscInt numVertices, PetscInt start[], PetscInt adjacency[], PetscSection vertSection, PetscSection edgeSection, PetscSection targetSection, PetscSection partSection, IS *partition)
 {
 #if defined(PETSC_HAVE_PTSCOTCH)
   MPI_Comm    comm;
@@ -238,6 +238,11 @@ static PetscErrorCode PetscPartitionerPartition_PTScotch(PetscPartitioner part, 
     PetscCall(PetscMalloc1(nvtxs, &vwgt));
     for (v = 0; v < nvtxs; ++v) PetscCall(PetscSectionGetDof(vertSection, v, &vwgt[v]));
   }
+  // Weight edges
+  if (edgeSection) {
+    PetscCall(PetscMalloc1(xadj[nvtxs], &adjwgt));
+    for (PetscInt e = 0; e < xadj[nvtxs]; ++e) PetscCall(PetscSectionGetDof(edgeSection, e, &adjwgt[e]));
+  }
 
   /* Calculate partition weights */
   if (targetSection) {
@@ -256,8 +261,7 @@ static PetscErrorCode PetscPartitionerPartition_PTScotch(PetscPartitioner part, 
     int                        strat = PTScotch_Strategy(pts->strategy);
     double                     imbal = (double)pts->imbalance;
 
-    for (p = 0; !vtxdist[p + 1] && p < size; ++p)
-      ;
+    for (p = 0; !vtxdist[p + 1] && p < size; ++p);
     if (vtxdist[p + 1] == vtxdist[size]) {
       if (rank == p) PetscCall(PTScotch_PartGraph_Seq(strat, imbal, nvtxs, xadj, adjncy, vwgt, adjwgt, nparts, tpwgts, assignment));
     } else {
@@ -279,6 +283,7 @@ static PetscErrorCode PetscPartitionerPartition_PTScotch(PetscPartitioner part, 
     }
   }
   PetscCall(PetscFree(vwgt));
+  PetscCall(PetscFree(adjwgt));
   PetscCall(PetscFree(tpwgts));
 
   /* Convert to PetscSection+IS */

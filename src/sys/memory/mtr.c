@@ -203,7 +203,7 @@ static PetscErrorCode PetscTrMallocDefault(size_t a, PetscBool clear, int lineno
 #if defined(PETSC_USE_DEBUG) && !defined(PETSC_HAVE_THREADSAFETY)
   PetscCall(PetscStackCopy(&petscstack, &head->stack));
   /* fix the line number to where PetscTrMallocDefault() was called, not the PetscFunctionBegin; */
-  head->stack.line[head->stack.currentsize - 2] = lineno;
+  head->stack.line[PetscMax(head->stack.currentsize - 2, 0)] = lineno;
   head->stack.currentsize--;
   #if defined(PETSC_USE_REAL_SINGLE) || defined(PETSC_USE_REAL_DOUBLE)
   if (!clear && TRdebugIinitializenan) {
@@ -413,7 +413,7 @@ static PetscErrorCode PetscTrReallocDefault(size_t len, int lineno, const char f
 #if defined(PETSC_USE_DEBUG) && !defined(PETSC_HAVE_THREADSAFETY)
   PetscCall(PetscStackCopy(&petscstack, &head->stack));
   /* fix the line number to where the malloc() was called, not the PetscFunctionBegin; */
-  head->stack.line[head->stack.currentsize - 2] = lineno;
+  head->stack.line[PetscMax(head->stack.currentsize - 2, 0)] = lineno;
 #endif
 
   /*
@@ -874,7 +874,7 @@ PetscErrorCode PetscMallocView(FILE *fp)
   PetscCallMPI(MPI_Comm_rank(MPI_COMM_WORLD, &rank));
   PetscCall(PetscFFlush(fp));
 
-  PetscCheck(PetscLogMalloc >= 0, PETSC_COMM_SELF, PETSC_ERR_ARG_WRONGSTATE, "PetscMallocView() called without call to PetscMallocViewSet() this is often due to\n                      setting the option -malloc_view AFTER PetscInitialize() with PetscOptionsInsert() or PetscOptionsInsertFile()");
+  PetscCheck(PetscLogMalloc >= 0, PETSC_COMM_SELF, PETSC_ERR_ARG_WRONGSTATE, "PetscMallocView() called without call to PetscMallocViewSet() this is often due to setting the option -malloc_view AFTER PetscInitialize() with PetscOptionsInsert() or PetscOptionsInsertFile()");
 
   if (!fp) fp = PETSC_STDOUT;
   PetscCall(PetscMemoryGetMaximumUsage(&rss));

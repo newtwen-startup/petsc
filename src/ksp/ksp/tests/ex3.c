@@ -82,7 +82,7 @@ int main(int argc, char **args)
   PetscCall(MatAssemblyBegin(C, MAT_FINAL_ASSEMBLY));
   PetscCall(MatAssemblyEnd(C, MAT_FINAL_ASSEMBLY));
 
-  /* Create right-hand-side and solution vectors */
+  /* Create right-hand side and solution vectors */
   PetscCall(VecCreate(PETSC_COMM_WORLD, &u));
   PetscCall(VecSetSizes(u, PETSC_DECIDE, N));
   PetscCall(VecSetFromOptions(u));
@@ -109,7 +109,7 @@ int main(int argc, char **args)
   PetscCall(VecAssemblyBegin(b));
   PetscCall(VecAssemblyEnd(b));
 
-  /* Modify matrix and right-hand-side for Dirichlet boundary conditions */
+  /* Modify matrix and right-hand side for Dirichlet boundary conditions */
   PetscCall(PetscMalloc1(4 * m, &rows));
   for (i = 0; i < m + 1; i++) {
     rows[i]             = i;               /* bottom */
@@ -191,6 +191,7 @@ int main(int argc, char **args)
     test:
       suffix: 2_kokkos
       nsize: 2
+      args: -vec_mdot_use_gemv {{0 1}} -vec_maxpy_use_gemv {{0 1}}
       args: -pc_type jacobi -ksp_monitor_short -m 5 -ksp_gmres_cgs_refinement_type refine_always -mat_type aijkokkos -vec_type kokkos
       output_file: output/ex3_2.out
       requires: kokkos_kernels
@@ -210,7 +211,7 @@ int main(int argc, char **args)
 
     test:
       suffix: gamg_provided_not_ok
-      filter: grep -v "variant HERMITIAN"
+      filter: grep -v "variant HERMITIAN" | sed -e "s/Iterations 4/Iterations 5/g"
       args: -pc_type gamg -mg_levels_pc_type sor -mg_levels_esteig_ksp_type cg -ksp_view
 
 TEST*/

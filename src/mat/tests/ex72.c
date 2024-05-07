@@ -88,7 +88,7 @@ int main(int argc, char **argv)
 /*TEST
 
    build:
-      requires:  !complex double !defined(PETSC_USE_64BIT_INDICES)
+      requires: !complex double !defined(PETSC_USE_64BIT_INDICES)
       depends: mmloader.c mmio.c
 
    test:

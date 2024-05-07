@@ -49,7 +49,7 @@ class Configure(config.package.CMakePackage):
 
   def checkTrilinosDuplicates(self):
     # we check this in two places, before doing a Trilinos install and (for when PETSc does not install Trilinos) when checking that
-    # the the Trilinos libraries are valid
+    # the Trilinos libraries are valid
     if self.zoltan.found:
       raise RuntimeError('Trilinos contains Zoltan, therefore do not provide/build a Zoltan if you are providing/building Trilinos')
     if self.ml.found:
@@ -109,7 +109,7 @@ class Configure(config.package.CMakePackage):
           trequires = 1
       if trequires:
         if bf.find('(Dev)') > -1:
-          self.requirespath = 0
+          self.requiresrpath = 0
       bf = fd.readline()
     fd.close()
 

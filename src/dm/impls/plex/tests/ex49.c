@@ -42,9 +42,13 @@ static PetscErrorCode SetupDiscretization(DM dm, AppCtx *user)
   PetscFunctionBeginUser;
   PetscCall(DMGetDimension(dm, &dim));
   if (user->useFE) {
-    PetscFE fe;
+    PetscFE        fe;
+    DMPolytopeType ct;
+    PetscInt       cStart;
 
-    PetscCall(PetscFECreateDefault(PETSC_COMM_SELF, dim, 1, PETSC_FALSE, NULL, -1, &fe));
+    PetscCall(DMPlexGetHeightStratum(dm, 0, &cStart, NULL));
+    PetscCall(DMPlexGetCellType(dm, cStart, &ct));
+    PetscCall(PetscFECreateByCell(PETSC_COMM_SELF, dim, 1, ct, NULL, -1, &fe));
     PetscCall(PetscObjectSetName((PetscObject)fe, "scalar"));
     PetscCall(DMSetField(dm, 0, NULL, (PetscObject)fe));
     PetscCall(DMSetField(dm, 1, NULL, (PetscObject)fe));
@@ -60,7 +64,6 @@ static PetscErrorCode SetupDiscretization(DM dm, AppCtx *user)
     PetscCall(PetscFVSetUp(fv));
     PetscCall(PetscObjectSetName((PetscObject)fv, "vector"));
     PetscCall(DMSetField(dm, 0, NULL, (PetscObject)fv));
-    PetscCall(DMSetField(dm, 1, NULL, (PetscObject)fv));
     PetscCall(PetscFVDestroy(&fv));
   }
   PetscCall(DMCreateDS(dm));
@@ -105,14 +108,15 @@ static PetscErrorCode CheckOffsets(DM dm, AppCtx *user, const char *domain_name,
       PetscCall(ISDestroy(&offIS));
     } else if (id == PETSCFV_CLASSID) {
       IS        offIS;
-      PetscInt *offsets, *offsetsNeg, *offsetsPos, Nface, Nc, n;
+      PetscInt *offsets, *offsetsNeg, *offsetsPos, Nface, Nc, n, i = 0;
 
       PetscCall(DMPlexGetLocalOffsetsSupport(dm, domain_label, label_value, &Nface, &Nc, &n, &offsetsNeg, &offsetsPos));
       PetscCall(PetscMalloc1(Nface * Nc * 2, &offsets));
-      for (PetscInt f = 0, i = 0; f < Nface; ++f) {
-        for (PetscInt c = 0; c < Nc; ++c) offsets[i++] = offsetsNeg[f * Nc + c];
-        for (PetscInt c = 0; c < Nc; ++c) offsets[i++] = offsetsPos[f * Nc + c];
+      for (PetscInt f = 0; f < Nface; ++f) {
+        for (PetscInt c = 0; c < Nc; ++c) offsets[i++] = offsetsNeg[f] + c;
+        for (PetscInt c = 0; c < Nc; ++c) offsets[i++] = offsetsPos[f] + c;
       }
+      PetscCheck(i == Nface * Nc * 2, PETSC_COMM_SELF, PETSC_ERR_ARG_SIZ, "Total offsets %" PetscInt_FMT " != %" PetscInt_FMT, i, Nface * Nc * 2);
       PetscCall(PetscFree(offsetsNeg));
       PetscCall(PetscFree(offsetsPos));
       PetscCall(ISCreateGeneral(PETSC_COMM_SELF, Nface * Nc * 2, offsets, PETSC_OWN_POINTER, &offIS));
@@ -179,6 +183,36 @@ static PetscErrorCode CheckOffsets(DM dm, AppCtx *user, const char *domain_name,
     PetscCall(PetscFree(offsets));
     PetscCall(DMGetLocalToGlobalMapping(cdm, &ltog));
     PetscCall(ISLocalToGlobalMappingViewFromOptions(ltog, NULL, "-coord_ltog_view"));
+    {
+      DM                 clonedm;
+      Vec                cloneX, X;
+      PetscInt           clone_num_x, num_x;
+      const PetscScalar *clonex, *x;
+
+      PetscCall(DMClone(dm, &clonedm));
+      { // Force recreation of local coordinate vector
+        Vec X_global;
+
+        PetscCall(DMGetCoordinates(dm, &X_global));
+        PetscCall(DMSetCoordinates(clonedm, X_global));
+      }
+      PetscCall(DMGetCoordinatesLocal(dm, &X));
+      PetscCall(DMGetCoordinatesLocal(clonedm, &cloneX));
+      PetscCall(VecGetLocalSize(X, &num_x));
+      PetscCall(VecGetLocalSize(cloneX, &clone_num_x));
+      PetscCheck(num_x == clone_num_x, PETSC_COMM_WORLD, PETSC_ERR_ARG_SIZ, "Cloned DM coordinate size (%" PetscInt_FMT ") different from original DM coordinate size (%" PetscInt_FMT ")", clone_num_x, num_x);
+
+      PetscCall(VecGetArrayRead(X, &x));
+      PetscCall(VecGetArrayRead(cloneX, &clonex));
+
+      for (PetscInt i = 0; i < num_x; i++) {
+        PetscCheck(PetscIsCloseAtTolScalar(x[i], clonex[i], 1e-13, 1e-13), PETSC_COMM_WORLD, PETSC_ERR_PLIB, "Original coordinate (%4.2f) and cloned coordinate (%4.2f) are different", (double)PetscRealPart(x[i]), (double)PetscRealPart(clonex[i]));
+      }
+
+      PetscCall(VecRestoreArrayRead(X, &x));
+      PetscCall(VecRestoreArrayRead(cloneX, &clonex));
+      PetscCall(DMDestroy(&clonedm));
+    }
   }
   PetscFunctionReturn(PETSC_SUCCESS);
 }
@@ -234,14 +268,20 @@ int main(int argc, char **argv)
     args: -dm_plex_simplex 0 -dm_plex_dim 2 -dm_plex_shape zbox -dm_plex_box_faces 4,3 -dm_distribute 0 -petscspace_degree 1 -dm_plex_box_bd periodic,none -dm_view ::ascii_info_detail
 
   testset:
-    args: -dm_plex_simplex 0 -dm_plex_dim 2 -dm_plex_shape zbox -dm_plex_box_faces 3,2 -petscspace_degree 1 -dm_plex_box_bd none,periodic -dm_view ::ascii_info_detail -closure_tensor
+    args: -dm_plex_simplex 0 -dm_plex_dim 2 -dm_plex_shape zbox -dm_plex_box_faces 3,2 -petscspace_degree 1 -dm_view ::ascii_info_detail -closure_tensor
     nsize: 2
     test:
       suffix: 2d_sfc_periodic_stranded
-      args: -dm_distribute 0
+      args: -dm_distribute 0 -dm_plex_box_bd none,periodic
     test:
       suffix: 2d_sfc_periodic_stranded_dist
-      args: -dm_distribute 1 -petscpartitioner_type simple
+      args: -dm_distribute 1 -petscpartitioner_type simple -dm_plex_box_bd none,periodic
+    test:
+      suffix: 2d_sfc_biperiodic_stranded
+      args: -dm_distribute 0 -dm_plex_box_bd periodic,periodic
+    test:
+      suffix: 2d_sfc_biperiodic_stranded_dist
+      args: -dm_distribute 1 -petscpartitioner_type simple -dm_plex_box_bd periodic,periodic
 
   test:
     suffix: fv_0

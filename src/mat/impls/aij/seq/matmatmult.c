@@ -71,6 +71,8 @@ PETSC_INTERN PetscErrorCode MatSetSeqAIJWithArrays_private(MPI_Comm comm, PetscI
   aij->free_a       = PETSC_FALSE;
   aij->free_ij      = PETSC_FALSE;
   PetscCall(MatCheckCompressedRow(mat, aij->nonzerorowcnt, &aij->compressedrow, aij->i, m, 0.6));
+  // Always build the diag info when i, j are set
+  PetscCall(MatMarkDiagonal_SeqAIJ(mat));
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
@@ -222,7 +224,7 @@ PetscErrorCode MatMatMultSymbolic_SeqAIJ_SeqAIJ_LLCondensed(Mat A, Mat B, PetscR
 
   /* MatCreateSeqAIJWithArrays flags matrix so PETSc doesn't free the user's arrays. */
   /* These are PETSc arrays, so change flags so arrays can be deleted by PETSc */
-  c          = (Mat_SeqAIJ *)(C->data);
+  c          = (Mat_SeqAIJ *)C->data;
   c->free_a  = PETSC_FALSE;
   c->free_ij = PETSC_TRUE;
   c->nonew   = 0;
@@ -296,15 +298,15 @@ PetscErrorCode MatMatMultNumeric_SeqAIJ_SeqAIJ_Sorted(Mat A, Mat B, Mat C)
     for (j = 0; j < anzi; j++) {
       brow = aj[j];
       bnzi = bi[brow + 1] - bi[brow];
-      bjj  = bj + bi[brow];
-      baj  = ba + bi[brow];
+      bjj  = PetscSafePointerPlusOffset(bj, bi[brow]);
+      baj  = PetscSafePointerPlusOffset(ba, bi[brow]);
       /* perform dense axpy */
       valtmp = aa[j];
       for (k = 0; k < bnzi; k++) ab_dense[bjj[k]] += valtmp * baj[k];
       flops += 2 * bnzi;
     }
-    aj += anzi;
-    aa += anzi;
+    aj = PetscSafePointerPlusOffset(aj, anzi);
+    aa = PetscSafePointerPlusOffset(aa, anzi);
 
     cnzi = ci[i + 1] - ci[i];
     for (k = 0; k < cnzi; k++) {
@@ -312,7 +314,7 @@ PetscErrorCode MatMatMultNumeric_SeqAIJ_SeqAIJ_Sorted(Mat A, Mat B, Mat C)
       ab_dense[cj[k]] = 0.0; /* zero ab_dense */
     }
     flops += cnzi;
-    cj += cnzi;
+    cj = PetscSafePointerPlusOffset(cj, cnzi);
     ca += cnzi;
   }
 #if defined(PETSC_HAVE_DEVICE)
@@ -464,7 +466,7 @@ PetscErrorCode MatMatMultSymbolic_SeqAIJ_SeqAIJ_Scalable_fast(Mat A, Mat B, Pets
 
   /* MatCreateSeqAIJWithArrays flags matrix so PETSc doesn't free the user's arrays. */
   /* These are PETSc arrays, so change flags so arrays can be deleted by PETSc */
-  c          = (Mat_SeqAIJ *)(C->data);
+  c          = (Mat_SeqAIJ *)C->data;
   c->free_a  = PETSC_TRUE;
   c->free_ij = PETSC_TRUE;
   c->nonew   = 0;
@@ -567,7 +569,7 @@ PetscErrorCode MatMatMultSymbolic_SeqAIJ_SeqAIJ_Scalable(Mat A, Mat B, PetscReal
 
   /* MatCreateSeqAIJWithArrays flags matrix so PETSc doesn't free the user's arrays. */
   /* These are PETSc arrays, so change flags so arrays can be deleted by PETSc */
-  c          = (Mat_SeqAIJ *)(C->data);
+  c          = (Mat_SeqAIJ *)C->data;
   c->free_a  = PETSC_TRUE;
   c->free_ij = PETSC_TRUE;
   c->nonew   = 0;
@@ -670,7 +672,7 @@ PetscErrorCode MatMatMultSymbolic_SeqAIJ_SeqAIJ_Heap(Mat A, Mat B, PetscReal fil
 
   /* MatCreateSeqAIJWithArrays flags matrix so PETSc doesn't free the user's arrays. */
   /* These are PETSc arrays, so change flags so arrays can be deleted by PETSc */
-  c          = (Mat_SeqAIJ *)(C->data);
+  c          = (Mat_SeqAIJ *)C->data;
   c->free_a  = PETSC_TRUE;
   c->free_ij = PETSC_TRUE;
   c->nonew   = 0;
@@ -786,7 +788,7 @@ PetscErrorCode MatMatMultSymbolic_SeqAIJ_SeqAIJ_BTHeap(Mat A, Mat B, PetscReal f
 
   /* MatCreateSeqAIJWithArrays flags matrix so PETSc doesn't free the user's arrays. */
   /* These are PETSc arrays, so change flags so arrays can be deleted by PETSc */
-  c          = (Mat_SeqAIJ *)(C->data);
+  c          = (Mat_SeqAIJ *)C->data;
   c->free_a  = PETSC_TRUE;
   c->free_ij = PETSC_TRUE;
   c->nonew   = 0;
@@ -1083,7 +1085,7 @@ PetscErrorCode MatMatMultSymbolic_SeqAIJ_SeqAIJ_RowMerge(Mat A, Mat B, PetscReal
 
   /* MatCreateSeqAIJWithArrays flags matrix so PETSc doesn't free the user's arrays. */
   /* These are PETSc arrays, so change flags so arrays can be deleted by PETSc */
-  c          = (Mat_SeqAIJ *)(C->data);
+  c          = (Mat_SeqAIJ *)C->data;
   c->free_a  = PETSC_TRUE;
   c->free_ij = PETSC_TRUE;
   c->nonew   = 0;
@@ -1136,8 +1138,8 @@ PetscErrorCode MatMatMultSymbolic_SeqAIJ_SeqAIJ_Sorted(Mat A, Mat B, PetscReal f
 
   /* Determine ci and cj */
   for (i = 0; i < am; i++) {
-    const PetscInt  anzi = ai[i + 1] - ai[i]; /* number of nonzeros in this row of A, this is the number of rows of B that we merge */
-    const PetscInt *acol = aj + ai[i];        /* column indices of nonzero entries in this row */
+    const PetscInt  anzi = ai[i + 1] - ai[i];                     /* number of nonzeros in this row of A, this is the number of rows of B that we merge */
+    const PetscInt *acol = PetscSafePointerPlusOffset(aj, ai[i]); /* column indices of nonzero entries in this row */
     PetscInt packlen     = 0, *PETSC_RESTRICT crow;
 
     /* Pack segrow */
@@ -1183,7 +1185,7 @@ PetscErrorCode MatMatMultSymbolic_SeqAIJ_SeqAIJ_Sorted(Mat A, Mat B, PetscReal f
 
   /* MatCreateSeqAIJWithArrays flags matrix so PETSc doesn't free the user's arrays. */
   /* These are PETSc arrays, so change flags so arrays can be deleted by PETSc */
-  c          = (Mat_SeqAIJ *)(C->data);
+  c          = (Mat_SeqAIJ *)C->data;
   c->free_a  = PETSC_TRUE;
   c->free_ij = PETSC_TRUE;
   c->nonew   = 0;
@@ -1296,7 +1298,7 @@ PetscErrorCode MatMatTransposeMultSymbolic_SeqAIJ_SeqAIJ(Mat A, Mat B, PetscReal
     {
       Mat_SeqAIJ *c = (Mat_SeqAIJ *)C->data;
       PetscCall(PetscInfo(C, "Use coloring of C=A*B^T; B^T: %" PetscInt_FMT " %" PetscInt_FMT ", Bt_dense: %" PetscInt_FMT ",%" PetscInt_FMT "; Cnz %" PetscInt_FMT " / (cm*ncolors %" PetscInt_FMT ") = %g\n", B->cmap->n, B->rmap->n, Bt_dense->rmap->n,
-                          Bt_dense->cmap->n, c->nz, A->rmap->n * matcoloring->ncolors, (double)(((PetscReal)(c->nz)) / ((PetscReal)(A->rmap->n * matcoloring->ncolors)))));
+                          Bt_dense->cmap->n, c->nz, A->rmap->n * matcoloring->ncolors, (double)(((PetscReal)c->nz) / ((PetscReal)(A->rmap->n * matcoloring->ncolors)))));
     }
 #endif
   }
@@ -1347,10 +1349,10 @@ PetscErrorCode MatMatTransposeMultNumeric_SeqAIJ_SeqAIJ(Mat A, Mat B, Mat C)
 
   for (i = 0; i < cm; i++) {
     anzi = ai[i + 1] - ai[i];
-    acol = aj + ai[i];
-    aval = aa + ai[i];
+    acol = PetscSafePointerPlusOffset(aj, ai[i]);
+    aval = PetscSafePointerPlusOffset(aa, ai[i]);
     cnzi = ci[i + 1] - ci[i];
-    ccol = cj + ci[i];
+    ccol = PetscSafePointerPlusOffset(cj, ci[i]);
     cval = ca + ci[i];
     for (j = 0; j < cnzi; j++) {
       brow = ccol[j];
@@ -1539,8 +1541,8 @@ PETSC_INTERN PetscErrorCode MatMatMultNumericAdd_SeqAIJ_SeqDense(Mat A, Mat B, M
     for (i = 0; i < am; i++) {                  /* over rows of A in those columns */
       r1 = r2 = r3 = r4 = 0.0;
       n                 = a->i[i + 1] - a->i[i];
-      aj                = a->j ? a->j + a->i[i] : NULL;
-      aa                = av ? av + a->i[i] : NULL;
+      aj                = PetscSafePointerPlusOffset(a->j, a->i[i]);
+      aa                = PetscSafePointerPlusOffset(av, a->i[i]);
       for (j = 0; j < n; j++) {
         const PetscScalar aatmp = aa[j];
         const PetscInt    ajtmp = aj[j];
@@ -1580,8 +1582,8 @@ PETSC_INTERN PetscErrorCode MatMatMultNumericAdd_SeqAIJ_SeqDense(Mat A, Mat B, M
       for (i = 0; i < am; i++) {
         r1 = 0.0;
         n  = a->i[i + 1] - a->i[i];
-        aj = a->j + a->i[i];
-        aa = av + a->i[i];
+        aj = PetscSafePointerPlusOffset(a->j, a->i[i]);
+        aa = PetscSafePointerPlusOffset(av, a->i[i]);
         for (j = 0; j < n; j++) r1 += aa[j] * b1[aj[j]];
         if (add) c1[i] += r1;
         else c1[i] = r1;
@@ -1590,8 +1592,8 @@ PETSC_INTERN PetscErrorCode MatMatMultNumericAdd_SeqAIJ_SeqDense(Mat A, Mat B, M
       for (i = 0; i < am; i++) {
         r1 = r2 = 0.0;
         n       = a->i[i + 1] - a->i[i];
-        aj      = a->j + a->i[i];
-        aa      = av + a->i[i];
+        aj      = PetscSafePointerPlusOffset(a->j, a->i[i]);
+        aa      = PetscSafePointerPlusOffset(av, a->i[i]);
         for (j = 0; j < n; j++) {
           const PetscScalar aatmp = aa[j];
           const PetscInt    ajtmp = aj[j];
@@ -1610,8 +1612,8 @@ PETSC_INTERN PetscErrorCode MatMatMultNumericAdd_SeqAIJ_SeqDense(Mat A, Mat B, M
       for (i = 0; i < am; i++) {
         r1 = r2 = r3 = 0.0;
         n            = a->i[i + 1] - a->i[i];
-        aj           = a->j ? a->j + a->i[i] : NULL;
-        aa           = av ? av + a->i[i] : NULL;
+        aj           = PetscSafePointerPlusOffset(a->j, a->i[i]);
+        aa           = PetscSafePointerPlusOffset(av, a->i[i]);
         for (j = 0; j < n; j++) {
           const PetscScalar aatmp = aa[j];
           const PetscInt    ajtmp = aj[j];

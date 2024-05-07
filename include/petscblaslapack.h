@@ -13,7 +13,7 @@
   PETSC_BLASLAPACK_C BLAS/LAPACK function names have no mangling
 
   PETSC_BLASLAPACK_SINGLEISDOUBLE - for Cray systems where the BLAS/LAPACK single precision (i.e. Fortran single precision is actually 64-bits)
-                                    old Cray vector machines used to be this way, it is is not clear if any exist now.
+                                    old Cray vector machines used to be this way, it is not clear if any exist now.
 
   PetscBLASInt is almost always 32-bit integers but can be 64-bit integers for certain usages of MKL and OpenBLAS BLAS/LAPACK libraries
 
@@ -120,6 +120,7 @@ BLAS_EXTERN void BLASsyr2k_(const char *, const char *, const PetscBLASInt *, co
 BLAS_EXTERN void BLASgemv_(const char *, const PetscBLASInt *, const PetscBLASInt *, const PetscScalar *, const PetscScalar *, const PetscBLASInt *, const PetscScalar *, const PetscBLASInt *, const PetscScalar *, PetscScalar *, const PetscBLASInt *);
 BLAS_EXTERN void LAPACKgetrs_(const char *, const PetscBLASInt *, const PetscBLASInt *, const PetscScalar *, const PetscBLASInt *, const PetscBLASInt *, PetscScalar *, const PetscBLASInt *, PetscBLASInt *);
 BLAS_EXTERN void BLAStrmv_(const char *, const char *, const char *, const PetscBLASInt *, const PetscScalar *, const PetscBLASInt *, PetscScalar *, const PetscBLASInt *);
+BLAS_EXTERN void BLAStrsv_(const char *, const char *, const char *, const PetscBLASInt *, const PetscScalar *, const PetscBLASInt *, PetscScalar *, const PetscBLASInt *);
 BLAS_EXTERN void BLASgemm_(const char *, const char *, const PetscBLASInt *, const PetscBLASInt *, const PetscBLASInt *, const PetscScalar *, const PetscScalar *, const PetscBLASInt *, const PetscScalar *, const PetscBLASInt *, const PetscScalar *, PetscScalar *, const PetscBLASInt *);
 BLAS_EXTERN void BLASREALgemm_(const char *, const char *, const PetscBLASInt *, const PetscBLASInt *, const PetscBLASInt *, const PetscReal *, const PetscReal *, const PetscBLASInt *, const PetscReal *, const PetscBLASInt *, const PetscReal *, PetscReal *, const PetscBLASInt *);
 BLAS_EXTERN void BLASsymm_(const char *, const char *, const PetscBLASInt *, const PetscBLASInt *, const PetscScalar *, const PetscScalar *, const PetscBLASInt *, const PetscScalar *, const PetscBLASInt *, const PetscScalar *, PetscScalar *, const PetscBLASInt *);
@@ -186,8 +187,8 @@ static inline PetscScalar BLASdotu_(const PetscBLASInt *n, const PetscScalar *x,
 }
 #else
   #if defined(PETSC_USE_REAL_SINGLE) && defined(PETSC_BLASLAPACK_SDOT_RETURNS_DOUBLE)
-BLAS_EXTERN double    BLASdot_(const PetscBLASInt *, const PetscScalar *, const PetscBLASInt *, const PetscScalar *, const PetscBLASInt *);
-BLAS_EXTERN double    BLASdotu_(const PetscBLASInt *, const PetscScalar *, const PetscBLASInt *, const PetscScalar *, const PetscBLASInt *);
+BLAS_EXTERN double BLASdot_(const PetscBLASInt *, const PetscScalar *, const PetscBLASInt *, const PetscScalar *, const PetscBLASInt *);
+BLAS_EXTERN double BLASdotu_(const PetscBLASInt *, const PetscScalar *, const PetscBLASInt *, const PetscScalar *, const PetscBLASInt *);
   #else
 BLAS_EXTERN PetscScalar BLASdot_(const PetscBLASInt *, const PetscScalar *, const PetscBLASInt *, const PetscScalar *, const PetscBLASInt *);
   #endif

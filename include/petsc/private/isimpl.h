@@ -74,15 +74,14 @@ struct _p_ISLocalToGlobalMapping {
   PetscBool  dealloc_indices; /* should indices be deallocated? */
   PetscInt   globalstart;     /* first global referenced in indices */
   PetscInt   globalend;       /* last + 1 global referenced in indices */
-  PetscBool  info_cached;     /* reuse GetInfo */
-  PetscBool  info_free;
   PetscInt   info_nproc;
   PetscInt  *info_procs;
   PetscInt  *info_numprocs;
   PetscInt **info_indices;
   PetscInt  *info_nodec;
   PetscInt **info_nodei;
-  void      *data; /* type specific data is stored here */
+  PetscSF    multileaves_sf; /* SF to communicate from local block indices to multi-leaves */
+  void      *data;           /* type specific data is stored here */
 };
 
 struct _n_ISColoring {

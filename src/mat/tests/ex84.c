@@ -71,7 +71,7 @@ int main(int argc, char **argv)
   PetscCall(PetscViewerPushFormat(inp_viewer, fmt));
   PetscCall(MatLoadComputeNorms(data_mat, inp_viewer, norms0));
   PetscCall(PetscViewerPopFormat(inp_viewer));
-  PetscCall(PetscViewerDestroy(&inp_viewer));
+  PetscCall(PetscOptionsRestoreViewer(&inp_viewer));
   PetscCall(MatViewFromOptions(data_mat, NULL, "-view_serial_mat"));
   PetscCall(MatDestroy(&data_mat));
 
@@ -98,12 +98,12 @@ int main(int argc, char **argv)
   test:
     suffix: 1
     requires: hdf5 datafilespath complex
-    args:  -serial_reader hdf5:${DATAFILESPATH}/matrices/hdf5/sample_data.h5::read -parallel_reader hdf5:${DATAFILESPATH}/matrices/hdf5/sample_data.h5::read
+    args: -serial_reader hdf5:${DATAFILESPATH}/matrices/hdf5/sample_data.h5::read -parallel_reader hdf5:${DATAFILESPATH}/matrices/hdf5/sample_data.h5::read
     nsize: {{1 2 4}}
 
   test:
     requires: hdf5 datafilespath
-    args:  -serial_reader hdf5:${DATAFILESPATH}/matrices/hdf5/tiny_rectangular_mat.h5::read -parallel_reader hdf5:${DATAFILESPATH}/matrices/hdf5/tiny_rectangular_mat.h5::read
+    args: -serial_reader hdf5:${DATAFILESPATH}/matrices/hdf5/tiny_rectangular_mat.h5::read -parallel_reader hdf5:${DATAFILESPATH}/matrices/hdf5/tiny_rectangular_mat.h5::read
     nsize: {{1 2}}
     test:
       suffix: 2-complex

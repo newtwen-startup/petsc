@@ -1,25 +1,21 @@
-  0 KSP Residual norm 719.386 
-  1 KSP Residual norm 212.248 
-  2 KSP Residual norm 79.0048 
-  3 KSP Residual norm 52.197 
-  4 KSP Residual norm 25.5344 
-  5 KSP Residual norm 12.7474 
-  6 KSP Residual norm 5.33936 
-  7 KSP Residual norm 2.49275 
-  8 KSP Residual norm 1.82264 
-  9 KSP Residual norm 1.25546 
- 10 KSP Residual norm 0.614442 
- 11 KSP Residual norm 0.232263 
- 12 KSP Residual norm 0.0870127 
- 13 KSP Residual norm 0.0292775 
- 14 KSP Residual norm 0.0130487 
- 15 KSP Residual norm 0.00807981 
- 16 KSP Residual norm 0.00401823 
-Linear solve converged due to CONVERGED_RTOL iterations 16
+  0 KSP Residual norm 811.729
+  1 KSP Residual norm 196.893
+  2 KSP Residual norm 75.8449
+  3 KSP Residual norm 28.2346
+  4 KSP Residual norm 7.67089
+  5 KSP Residual norm 4.07462
+  6 KSP Residual norm 1.78085
+  7 KSP Residual norm 0.760909
+  8 KSP Residual norm 0.285578
+  9 KSP Residual norm 0.0871707
+ 10 KSP Residual norm 0.0348666
+ 11 KSP Residual norm 0.0175898
+ 12 KSP Residual norm 0.00702007
+Linear solve converged due to CONVERGED_RTOL iterations 12
 KSP Object: 8 MPI processes
   type: cg
   maximum iterations=10000, initial guess is zero
-  tolerances:  relative=1e-05, absolute=1e-50, divergence=10000.
+  tolerances: relative=1e-05, absolute=1e-50, divergence=10000.
   left preconditioning
   using PRECONDITIONED norm type for convergence test
 PC Object: 8 MPI processes
@@ -33,15 +29,14 @@ PC Object: 8 MPI processes
         Using parallel coarse grid solver (all coarse grid equations not put on one process)
         AGG specific options
           Number of levels of aggressive coarsening 1
-          MIS-k aggressive coarsening
-          MIS-2 coarsening on aggressive levels
+          Square graph aggressive coarsening
           Number smoothing steps 1
-        Complexity:    grid = 1.038    operator = 1.04428
+        Complexity:    grid = 1.054    operator = 1.07125
   Coarse grid solver -- level 0 -------------------------------
     KSP Object: (mg_coarse_) 8 MPI processes
       type: cg
       maximum iterations=10000, initial guess is zero
-      tolerances:  relative=1e-05, absolute=1e-50, divergence=10000.
+      tolerances: relative=1e-05, absolute=1e-50, divergence=10000.
       left preconditioning
       using PRECONDITIONED norm type for convergence test
     PC Object: (mg_coarse_) 8 MPI processes
@@ -50,18 +45,18 @@ PC Object: 8 MPI processes
       linear system matrix = precond matrix:
       Mat Object: 8 MPI processes
         type: mpiaij
-        rows=114, cols=114, bs=6
-        total: nonzeros=8748, allocated nonzeros=8748
+        rows=162, cols=162, bs=6
+        total: nonzeros=14076, allocated nonzeros=14076
         total number of mallocs used during MatSetValues calls=0
           using I-node (on process 0) routines: found 4 nodes, limit used is 5
   Down solver (pre-smoother) on level 1 -------------------------------
     KSP Object: (mg_levels_1_) 8 MPI processes
       type: chebyshev
         Chebyshev polynomial of first kind
-        eigenvalue targets used: min 0.636368, max 3.34093
-        eigenvalues provided (min 0.0755794, max 3.18184) with transform: [0. 0.2; 0. 1.05]
+        eigenvalue targets used: min 0.637877, max 3.34886
+        eigenvalues provided (min 0.12274, max 3.18939) with transform: [0. 0.2; 0. 1.05]
       maximum iterations=2, nonzero initial guess
-      tolerances:  relative=1e-05, absolute=1e-50, divergence=10000.
+      tolerances: relative=1e-05, absolute=1e-50, divergence=10000.
       left preconditioning
       using NONE norm type for convergence test
     PC Object: (mg_levels_1_) 8 MPI processes
@@ -84,28 +79,24 @@ PC Object: 8 MPI processes
     total number of mallocs used during MatSetValues calls=0
       has attached near null space
       using I-node (on process 0) routines: found 125 nodes, limit used is 5
-  0 KSP Residual norm 0.00719386 
-  1 KSP Residual norm 0.00212248 
-  2 KSP Residual norm 0.000790048 
-  3 KSP Residual norm 0.00052197 
-  4 KSP Residual norm 0.000255344 
-  5 KSP Residual norm 0.000127474 
-  6 KSP Residual norm 5.33936e-05 
-  7 KSP Residual norm 2.49275e-05 
-  8 KSP Residual norm 1.82264e-05 
-  9 KSP Residual norm 1.25546e-05 
- 10 KSP Residual norm 6.14442e-06 
- 11 KSP Residual norm 2.32263e-06 
- 12 KSP Residual norm 8.70127e-07 
- 13 KSP Residual norm 2.92775e-07 
- 14 KSP Residual norm 1.30487e-07 
- 15 KSP Residual norm 8.07981e-08 
- 16 KSP Residual norm 4.01823e-08 
-Linear solve converged due to CONVERGED_RTOL iterations 16
+  0 KSP Residual norm 0.00811776
+  1 KSP Residual norm 0.0019706
+  2 KSP Residual norm 0.000760067
+  3 KSP Residual norm 0.000283356
+  4 KSP Residual norm 7.66295e-05
+  5 KSP Residual norm 4.03444e-05
+  6 KSP Residual norm 1.76322e-05
+  7 KSP Residual norm 7.55751e-06
+  8 KSP Residual norm 2.8446e-06
+  9 KSP Residual norm 8.72259e-07
+ 10 KSP Residual norm 3.49599e-07
+ 11 KSP Residual norm 1.76513e-07
+ 12 KSP Residual norm 7.01895e-08
+Linear solve converged due to CONVERGED_RTOL iterations 12
 KSP Object: 8 MPI processes
   type: cg
   maximum iterations=10000, initial guess is zero
-  tolerances:  relative=1e-05, absolute=1e-50, divergence=10000.
+  tolerances: relative=1e-05, absolute=1e-50, divergence=10000.
   left preconditioning
   using PRECONDITIONED norm type for convergence test
 PC Object: 8 MPI processes
@@ -119,15 +110,14 @@ PC Object: 8 MPI processes
         Using parallel coarse grid solver (all coarse grid equations not put on one process)
         AGG specific options
           Number of levels of aggressive coarsening 1
-          MIS-k aggressive coarsening
-          MIS-2 coarsening on aggressive levels
+          Square graph aggressive coarsening
           Number smoothing steps 1
-        Complexity:    grid = 1.038    operator = 1.04428
+        Complexity:    grid = 1.054    operator = 1.07125
   Coarse grid solver -- level 0 -------------------------------
     KSP Object: (mg_coarse_) 8 MPI processes
       type: cg
       maximum iterations=10000, initial guess is zero
-      tolerances:  relative=1e-05, absolute=1e-50, divergence=10000.
+      tolerances: relative=1e-05, absolute=1e-50, divergence=10000.
       left preconditioning
       using PRECONDITIONED norm type for convergence test
     PC Object: (mg_coarse_) 8 MPI processes
@@ -136,8 +126,8 @@ PC Object: 8 MPI processes
       linear system matrix = precond matrix:
       Mat Object: 8 MPI processes
         type: mpiaij
-        rows=114, cols=114, bs=6
-        total: nonzeros=8748, allocated nonzeros=8748
+        rows=162, cols=162, bs=6
+        total: nonzeros=14076, allocated nonzeros=14076
         total number of mallocs used during MatSetValues calls=0
           using nonscalable MatPtAP() implementation
           using I-node (on process 0) routines: found 4 nodes, limit used is 5
@@ -145,18 +135,20 @@ PC Object: 8 MPI processes
     KSP Object: (mg_levels_1_) 8 MPI processes
       type: chebyshev
         Chebyshev polynomial of first kind
-        eigenvalue targets used: min 0.636368, max 3.34093
-        eigenvalues estimated via cg: min 0.0755794, max 3.18184
-        eigenvalues estimated using cg with transform: [0. 0.2; 0. 1.05]
+        eigenvalue targets used: min 0.637376, max 3.34622
+        eigenvalues estimated via gmres: min 0.0806313, max 3.18688
+        eigenvalues estimated using gmres with transform: [0. 0.2; 0. 1.05]
         KSP Object: (mg_levels_1_esteig_) 8 MPI processes
-          type: cg
+          type: gmres
+            restart=30, using Classical (unmodified) Gram-Schmidt Orthogonalization with no iterative refinement
+            happy breakdown tolerance 1e-30
           maximum iterations=10, initial guess is zero
-          tolerances:  relative=1e-12, absolute=1e-50, divergence=10000.
+          tolerances: relative=1e-12, absolute=1e-50, divergence=10000.
           left preconditioning
           using PRECONDITIONED norm type for convergence test
-        estimating eigenvalues using noisy right hand side
+        estimating eigenvalues using a noisy random number generated right-hand side
       maximum iterations=2, nonzero initial guess
-      tolerances:  relative=1e-05, absolute=1e-50, divergence=10000.
+      tolerances: relative=1e-05, absolute=1e-50, divergence=10000.
       left preconditioning
       using NONE norm type for convergence test
     PC Object: (mg_levels_1_) 8 MPI processes
@@ -179,28 +171,24 @@ PC Object: 8 MPI processes
     total number of mallocs used during MatSetValues calls=0
       has attached near null space
       using I-node (on process 0) routines: found 125 nodes, limit used is 5
-  0 KSP Residual norm 0.00719386 
-  1 KSP Residual norm 0.00212248 
-  2 KSP Residual norm 0.000790048 
-  3 KSP Residual norm 0.00052197 
-  4 KSP Residual norm 0.000255344 
-  5 KSP Residual norm 0.000127474 
-  6 KSP Residual norm 5.33936e-05 
-  7 KSP Residual norm 2.49275e-05 
-  8 KSP Residual norm 1.82264e-05 
-  9 KSP Residual norm 1.25546e-05 
- 10 KSP Residual norm 6.14442e-06 
- 11 KSP Residual norm 2.32263e-06 
- 12 KSP Residual norm 8.70127e-07 
- 13 KSP Residual norm 2.92775e-07 
- 14 KSP Residual norm 1.30487e-07 
- 15 KSP Residual norm 8.07981e-08 
- 16 KSP Residual norm 4.01823e-08 
-Linear solve converged due to CONVERGED_RTOL iterations 16
+  0 KSP Residual norm 0.00811776
+  1 KSP Residual norm 0.0019706
+  2 KSP Residual norm 0.000760067
+  3 KSP Residual norm 0.000283356
+  4 KSP Residual norm 7.66295e-05
+  5 KSP Residual norm 4.03444e-05
+  6 KSP Residual norm 1.76322e-05
+  7 KSP Residual norm 7.55751e-06
+  8 KSP Residual norm 2.8446e-06
+  9 KSP Residual norm 8.72259e-07
+ 10 KSP Residual norm 3.49599e-07
+ 11 KSP Residual norm 1.76513e-07
+ 12 KSP Residual norm 7.01895e-08
+Linear solve converged due to CONVERGED_RTOL iterations 12
 KSP Object: 8 MPI processes
   type: cg
   maximum iterations=10000, initial guess is zero
-  tolerances:  relative=1e-05, absolute=1e-50, divergence=10000.
+  tolerances: relative=1e-05, absolute=1e-50, divergence=10000.
   left preconditioning
   using PRECONDITIONED norm type for convergence test
 PC Object: 8 MPI processes
@@ -214,15 +202,14 @@ PC Object: 8 MPI processes
         Using parallel coarse grid solver (all coarse grid equations not put on one process)
         AGG specific options
           Number of levels of aggressive coarsening 1
-          MIS-k aggressive coarsening
-          MIS-2 coarsening on aggressive levels
+          Square graph aggressive coarsening
           Number smoothing steps 1
-        Complexity:    grid = 1.038    operator = 1.04428
+        Complexity:    grid = 1.054    operator = 1.07125
   Coarse grid solver -- level 0 -------------------------------
     KSP Object: (mg_coarse_) 8 MPI processes
       type: cg
       maximum iterations=10000, initial guess is zero
-      tolerances:  relative=1e-05, absolute=1e-50, divergence=10000.
+      tolerances: relative=1e-05, absolute=1e-50, divergence=10000.
       left preconditioning
       using PRECONDITIONED norm type for convergence test
     PC Object: (mg_coarse_) 8 MPI processes
@@ -231,8 +218,8 @@ PC Object: 8 MPI processes
       linear system matrix = precond matrix:
       Mat Object: 8 MPI processes
         type: mpiaij
-        rows=114, cols=114, bs=6
-        total: nonzeros=8748, allocated nonzeros=8748
+        rows=162, cols=162, bs=6
+        total: nonzeros=14076, allocated nonzeros=14076
         total number of mallocs used during MatSetValues calls=0
           using nonscalable MatPtAP() implementation
           using I-node (on process 0) routines: found 4 nodes, limit used is 5
@@ -240,18 +227,20 @@ PC Object: 8 MPI processes
     KSP Object: (mg_levels_1_) 8 MPI processes
       type: chebyshev
         Chebyshev polynomial of first kind
-        eigenvalue targets used: min 0.636368, max 3.34093
-        eigenvalues estimated via cg: min 0.0755794, max 3.18184
-        eigenvalues estimated using cg with transform: [0. 0.2; 0. 1.05]
+        eigenvalue targets used: min 0.637376, max 3.34622
+        eigenvalues estimated via gmres: min 0.0806313, max 3.18688
+        eigenvalues estimated using gmres with transform: [0. 0.2; 0. 1.05]
         KSP Object: (mg_levels_1_esteig_) 8 MPI processes
-          type: cg
+          type: gmres
+            restart=30, using Classical (unmodified) Gram-Schmidt Orthogonalization with no iterative refinement
+            happy breakdown tolerance 1e-30
           maximum iterations=10, initial guess is zero
-          tolerances:  relative=1e-12, absolute=1e-50, divergence=10000.
+          tolerances: relative=1e-12, absolute=1e-50, divergence=10000.
           left preconditioning
           using PRECONDITIONED norm type for convergence test
-        estimating eigenvalues using noisy right hand side
+        estimating eigenvalues using a noisy random number generated right-hand side
       maximum iterations=2, nonzero initial guess
-      tolerances:  relative=1e-05, absolute=1e-50, divergence=10000.
+      tolerances: relative=1e-05, absolute=1e-50, divergence=10000.
       left preconditioning
       using NONE norm type for convergence test
     PC Object: (mg_levels_1_) 8 MPI processes
@@ -274,4 +263,4 @@ PC Object: 8 MPI processes
     total number of mallocs used during MatSetValues calls=0
       has attached near null space
       using I-node (on process 0) routines: found 125 nodes, limit used is 5
-[0]main |b-Ax|/|b|=9.429752e-05, |b|=5.391826e+00, emax=9.988419e-01
+[0]main |b-Ax|/|b|=2.411451e-04, |b|=5.391826e+00, emax=9.916715e-01

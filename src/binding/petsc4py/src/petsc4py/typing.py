@@ -27,61 +27,62 @@ from .PETSc import (
 )
 
 __all__ = [
-    "Scalar",
-    "ArrayInt",
-    "ArrayReal",
-    "ArrayComplex",
-    "ArrayScalar",
-    "DimsSpec",
-    "AccessModeSpec",
-    "InsertModeSpec",
-    "ScatterModeSpec",
-    "LayoutSizeSpec",
-    "NormTypeSpec",
-    "MatAssemblySpec",
-    "MatSizeSpec",
-    "MatBlockSizeSpec",
-    "CSRIndicesSpec",
-    "CSRSpec",
-    "NNZSpec",
-    "MatNullFunction",
-    "DMCoarsenHookFunction",
-    "DMRestrictHookFunction",
-    "KSPRHSFunction",
-    "KSPOperatorsFunction",
-    "KSPConvergenceTestFunction",
-    "KSPMonitorFunction",
-    "TSRHSFunction",
-    "TSRHSJacobian",
-    "TSRHSJacobianP",
-    "TSIFunction",
-    "TSIJacobian",
-    "TSIJacobianP",
-    "TSI2Function",
-    "TSI2Jacobian",
-    "TSI2JacobianP",
-    "TSMonitorFunction",
-    "TSPreStepFunction",
-    "TSPostStepFunction",
-    "TSEventHandlerFunction",
-    "TSPostEventFunction",
-    "TSPreStepFunction",
-    "TSPostStepFunction",
-    "TAOObjectiveFunction",
-    "TAOGradientFunction",
-    "TAOObjectiveGradientFunction",
-    "TAOHessianFunction",
-    "TAOUpdateFunction",
-    "TAOMonitorFunction",
-    "TAOConvergedFunction",
-    "TAOJacobianFunction",
-    "TAOResidualFunction",
-    "TAOJacobianResidualFunction",
-    "TAOVariableBoundsFunction",
-    "TAOConstraintsFunction",
-    "TAOLSObjectiveFunction",
-    "TAOLSGradientFunction",
-    "TAOLSObjectiveGradientFunction",
+    'Scalar',
+    'ArrayBool',
+    'ArrayInt',
+    'ArrayReal',
+    'ArrayComplex',
+    'ArrayScalar',
+    'DimsSpec',
+    'AccessModeSpec',
+    'InsertModeSpec',
+    'ScatterModeSpec',
+    'LayoutSizeSpec',
+    'NormTypeSpec',
+    'MatAssemblySpec',
+    'MatSizeSpec',
+    'MatBlockSizeSpec',
+    'CSRIndicesSpec',
+    'CSRSpec',
+    'NNZSpec',
+    'MatNullFunction',
+    'DMCoarsenHookFunction',
+    'DMRestrictHookFunction',
+    'KSPRHSFunction',
+    'KSPOperatorsFunction',
+    'KSPConvergenceTestFunction',
+    'KSPMonitorFunction',
+    'TSRHSFunction',
+    'TSRHSJacobian',
+    'TSRHSJacobianP',
+    'TSIFunction',
+    'TSIJacobian',
+    'TSIJacobianP',
+    'TSI2Function',
+    'TSI2Jacobian',
+    'TSI2JacobianP',
+    'TSMonitorFunction',
+    'TSPreStepFunction',
+    'TSPostStepFunction',
+    'TSIndicatorFunction',
+    'TSPostEventFunction',
+    'TSPreStepFunction',
+    'TSPostStepFunction',
+    'TAOObjectiveFunction',
+    'TAOGradientFunction',
+    'TAOObjectiveGradientFunction',
+    'TAOHessianFunction',
+    'TAOUpdateFunction',
+    'TAOMonitorFunction',
+    'TAOConvergedFunction',
+    'TAOJacobianFunction',
+    'TAOResidualFunction',
+    'TAOJacobianResidualFunction',
+    'TAOVariableBoundsFunction',
+    'TAOConstraintsFunction',
+    'TAOLSObjectiveFunction',
+    'TAOLSGradientFunction',
+    'TAOLSObjectiveGradientFunction',
 ]
 
 # --- Sys ---
@@ -93,6 +94,9 @@ Scalars can be either `float` or `complex` (but not both) depending on how
 PETSc was configured (``./configure --with-scalar-type=real|complex``).
 
 """
+
+ArrayBool = NDArray[bool]
+"""Array of `bool`."""
 
 ArrayInt = NDArray[int]
 """Array of `int`."""
@@ -270,7 +274,7 @@ DMRestrictHookFunction = Callable[[DM, Mat, Vec, Mat, DM], None]
 # --- KSP ---
 
 KSPRHSFunction = Callable[[KSP, Vec], None]
-"""`PETSc.KSP` right hand side function callback."""
+"""`PETSc.KSP` right-hand side function callback."""
 
 KSPOperatorsFunction = Callable[[KSP, Mat, Mat], None]
 """`PETSc.KSP` operators function callback."""
@@ -280,6 +284,12 @@ KSPConvergenceTestFunction = Callable[[KSP, int, float], KSP.ConvergedReason]
 
 KSPMonitorFunction = Callable[[KSP, int, float], None]
 """`PETSc.KSP` monitor callback."""
+
+KSPPreSolveFunction = Callable[[KSP, Vec, Vec], None]
+"""`PETSc.KSP` pre solve callback."""
+
+KSPPostSolveFunction = Callable[[KSP, Vec, Vec], None]
+"""`PETSc.KSP` post solve callback."""
 
 # --- SNES ---
 
@@ -307,19 +317,21 @@ SNESLSPreFunction = Callable[[Vec, Vec], None]
 SNESNGSFunction = Callable[[SNES, Vec, Vec], None]
 """`SNES` nonlinear Gauss-Seidel callback."""
 
-SNESConvergedFunction = Callable[[SNES, int, tuple[float, float, float]], SNES.ConvergedReason]
+SNESConvergedFunction = Callable[
+    [SNES, int, tuple[float, float, float]], SNES.ConvergedReason
+]
 """`SNES` convergence test callback."""
 
 # --- TS ---
 
 TSRHSFunction = Callable[[TS, float, Vec, Vec], None]
-"""`TS` right hand side function callback."""
+"""`TS` right-hand side function callback."""
 
 TSRHSJacobian = Callable[[TS, float, Vec, Mat, Mat], None]
-"""`TS` right hand side Jacobian callback."""
+"""`TS` right-hand side Jacobian callback."""
 
 TSRHSJacobianP = Callable[[TS, float, Vec, Mat], None]
-"""`TS` right hand side parameter Jacobian callback."""
+"""`TS` right-hand side parameter Jacobian callback."""
 
 TSIFunction = Callable[[TS, float, Vec, Vec, Vec], None]
 """`TS` implicit function callback."""
@@ -348,11 +360,11 @@ TSPreStepFunction = Callable[[TS], None]
 TSPostStepFunction = Callable[[TS], None]
 """`TS` post-step callback."""
 
-TSEventHandlerFunction = Callable[[TS, float, Vec, NDArray[Scalar]], None]
-"""`TS` event handler callback."""
+TSIndicatorFunction = Callable[[TS, float, Vec, NDArray[float]], None]
+"""`TS` event indicator callback."""
 
 TSPostEventFunction = Callable[[TS, NDArray[int], float, Vec, bool], None]
-"""`TS` post-event handler callback."""
+"""`TS` post-event callback."""
 
 # --- TAO ---
 
@@ -362,7 +374,7 @@ TAOObjectiveFunction = Callable[[TAO, Vec], float]
 TAOGradientFunction = Callable[[TAO, Vec, Vec], None]
 """`TAO` objective gradient callback."""
 
-TAOObjectiveGradientFunction =  Callable[[TAO, Vec, Vec], float]
+TAOObjectiveGradientFunction = Callable[[TAO, Vec, Vec], float]
 """`TAO` objective function and gradient callback."""
 
 TAOHessianFunction = Callable[[TAO, Vec, Mat, Mat], None]
@@ -400,4 +412,3 @@ TAOLSGradientFunction = Callable[[TAOLineSearch, Vec, Vec], None]
 
 TAOLSObjectiveGradientFunction = Callable[[TAOLineSearch, Vec, Vec], float]
 """`TAOLineSearch` objective function and gradient callback."""
-

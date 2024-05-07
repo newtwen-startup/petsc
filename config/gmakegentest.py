@@ -91,7 +91,7 @@ class generateExamples(Petsc):
       the dependencies, etc.
   """
   def __init__(self,petsc_dir=None, petsc_arch=None, pkg_dir=None, pkg_arch=None, pkg_name=None, pkg_pkgs=None, testdir='tests', verbose=False, single_ex=False, srcdir=None, check=False):
-    super(generateExamples, self).__init__(petsc_dir=petsc_dir, petsc_arch=petsc_arch, pkg_dir=pkg_dir, pkg_arch=pkg_arch, pkg_name=pkg_name, pkg_pkgs=pkg_pkgs, verbose=verbose)
+    super(generateExamples, self).__init__(petsc_dir=petsc_dir, petsc_arch=petsc_arch, pkg_dir=pkg_dir, pkg_arch=pkg_arch, pkg_name=pkg_name, pkg_pkgs=pkg_pkgs)
 
     self.single_ex=single_ex
     self.srcdir=srcdir
@@ -374,7 +374,7 @@ class generateExamples(Petsc):
     subst['label_suffix']=''
     subst['comments']="\n#".join(subst['comments'].split("\n"))
     if subst['comments']: subst['comments']="#"+subst['comments']
-    subst['exec']="../"+subst['execname']
+    subst['executable']="../"+subst['execname']
     subst['testroot']=self.testroot_dir
     subst['testname']=testname
     dp = self.conf.get('DATAFILESPATH','')

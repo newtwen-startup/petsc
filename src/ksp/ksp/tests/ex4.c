@@ -88,13 +88,13 @@ int main(int argc, char **args)
   PetscCall(MatAssemblyBegin(C, MAT_FINAL_ASSEMBLY));
   PetscCall(MatAssemblyEnd(C, MAT_FINAL_ASSEMBLY));
 
-  /* create right hand side and solution */
+  /* create right-hand side and solution */
   PetscCall(MatCreateVecs(C, &u, &b));
   PetscCall(VecDuplicate(u, &ustar));
   PetscCall(VecSet(u, 0.0));
   PetscCall(VecSet(b, 0.0));
 
-  /* assemble the right hand side: only process 0 adds the values, not scalable */
+  /* assemble the right-hand side: only MPI process with rank 0 adds the values, this is not scalable */
   if (rank == 0) {
     for (i = 0; i < M; i++) {
       /* location of lower left corner of element */
@@ -169,6 +169,23 @@ int main(int argc, char **args)
   PetscCall(KSPGetIterationNumber(ksp, &its));
   PetscCall(PetscPrintf(PETSC_COMM_WORLD, "Norm of error %g Iterations %" PetscInt_FMT "\n", (double)(norm * h), its));
 
+  { // Test getting Jacobi diag
+    PC        pc;
+    PetscBool is_pcjacobi;
+
+    PetscCall(KSPGetPC(ksp, &pc));
+    PetscCall(PetscObjectTypeCompare((PetscObject)pc, PCJACOBI, &is_pcjacobi));
+    if (is_pcjacobi) {
+      Vec diag;
+
+      PetscCall(MatCreateVecs(C, &diag, NULL));
+      PetscCall(PCJacobiGetDiagonal(pc, diag, NULL));
+      PetscCall(VecNorm(diag, NORM_2, &norm));
+      PetscCheck(norm > 0, PETSC_COMM_WORLD, PETSC_ERR_USER, "Jacobi preconditioner should have norm greater than 0");
+      PetscCall(VecDestroy(&diag));
+    }
+  }
+
   PetscCall(KSPDestroy(&ksp));
   PetscCall(VecDestroy(&ustar));
   PetscCall(VecDestroy(&u));
@@ -189,7 +206,7 @@ int main(int argc, char **args)
 
     test:
       suffix: 5
-      args: -pc_type eisenstat -ksp_monitor_short -m 5  -ksp_gmres_cgs_refinement_type refine_always
+      args: -pc_type eisenstat -ksp_monitor_short -m 5 -ksp_gmres_cgs_refinement_type refine_always
 
     test:
       requires: hypre defined(PETSC_HAVE_HYPRE_DEVICE)

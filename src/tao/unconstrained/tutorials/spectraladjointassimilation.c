@@ -115,8 +115,6 @@ int main(int argc, char **argv)
   /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
      Initialize program and set problem parameters
      - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
-  PetscFunctionBegin;
-
   PetscFunctionBeginUser;
   PetscCall(PetscInitialize(&argc, &argv, (char *)0, help));
 
@@ -206,7 +204,7 @@ int main(int argc, char **argv)
 
   /*
    For linear problems with a time-dependent f(u,t) in the equation
-   u_t = f(u,t), the user provides the discretized right-hand-side
+   u_t = f(u,t), the user provides the discretized right-hand side
    as a time-dependent matrix.
    */
   PetscCall(RHSLaplacian(appctx.ts, 0.0, u, appctx.SEMop.stiff, appctx.SEMop.stiff, &appctx));
@@ -252,7 +250,7 @@ int main(int argc, char **argv)
 
   /* Create TAO solver and set desired solution method  */
   PetscCall(TaoCreate(PETSC_COMM_WORLD, &tao));
-  PetscCall(TaoSetMonitor(tao, MonitorError, &appctx, MonitorDestroy));
+  PetscCall(TaoMonitorSet(tao, MonitorError, &appctx, MonitorDestroy));
   PetscCall(TaoSetType(tao, TAOBQNLS));
   PetscCall(TaoSetSolution(tao, appctx.dat.ic));
   /* Set routine for function and gradient evaluation  */
@@ -656,16 +654,16 @@ PetscErrorCode MonitorDestroy(void **ctx)
 
    test:
      requires: !single
-     args:  -ts_adapt_dt_max 3.e-3 -E 10 -N 8 -ncoeff 5 -tao_bqnls_mat_lmvm_scale_type none
+     args: -ts_adapt_dt_max 3.e-3 -E 10 -N 8 -ncoeff 5 -tao_bqnls_mat_lmvm_scale_type none
 
    test:
      suffix: cn
      requires: !single
-     args:  -ts_type cn -ts_dt .003 -pc_type lu -E 10 -N 8 -ncoeff 5 -tao_bqnls_mat_lmvm_scale_type none
+     args: -ts_type cn -ts_dt .003 -pc_type lu -E 10 -N 8 -ncoeff 5 -tao_bqnls_mat_lmvm_scale_type none
 
    test:
      suffix: 2
      requires: !single
-     args:  -ts_adapt_dt_max 3.e-3 -E 10 -N 8 -ncoeff 5  -a .1 -tao_bqnls_mat_lmvm_scale_type none
+     args: -ts_adapt_dt_max 3.e-3 -E 10 -N 8 -ncoeff 5 -a .1 -tao_bqnls_mat_lmvm_scale_type none
 
 TEST*/

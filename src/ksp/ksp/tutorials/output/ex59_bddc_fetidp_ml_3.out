@@ -1,7 +1,7 @@
 KSP Object: (physical_) 4 MPI processes
   type: cg
   maximum iterations=10, initial guess is zero
-  tolerances:  relative=1e-05, absolute=1e-50, divergence=10000.
+  tolerances: relative=1e-05, absolute=1e-50, divergence=10000.
   left preconditioning
   using PRECONDITIONED norm type for convergence test
 PC Object: (physical_) 4 MPI processes
@@ -59,7 +59,7 @@ PC Object: (physical_) 4 MPI processes
     KSP Object: (physical_pc_bddc_dirichlet_) 1 MPI process
       type: preonly
       maximum iterations=10000, initial guess is zero
-      tolerances:  relative=1e-05, absolute=1e-50, divergence=10000.
+      tolerances: relative=1e-05, absolute=1e-50, divergence=10000.
       left preconditioning
       using NONE norm type for convergence test
     PC Object: (physical_pc_bddc_dirichlet_) 1 MPI process
@@ -86,7 +86,7 @@ PC Object: (physical_) 4 MPI processes
     KSP Object: (physical_pc_bddc_neumann_) 1 MPI process
       type: preonly
       maximum iterations=1000, initial guess is zero
-      tolerances:  relative=1e-10, absolute=1e-10, divergence=10000.
+      tolerances: relative=1e-10, absolute=1e-10, divergence=10000.
       left preconditioning
       using NONE norm type for convergence test
     PC Object: (physical_pc_bddc_neumann_) 1 MPI process
@@ -113,12 +113,38 @@ PC Object: (physical_) 4 MPI processes
     KSP Object: (physical_pc_bddc_coarse_) 1 MPI process
       type: preonly
       maximum iterations=1000, initial guess is zero
-      tolerances:  relative=1e-10, absolute=1e-10, divergence=10000.
+      tolerances: relative=1e-10, absolute=1e-10, divergence=10000.
       left preconditioning
       using NONE norm type for convergence test
     PC Object: (physical_pc_bddc_coarse_) 1 MPI process
       type: redundant
         First (color=0) of 1 PCs follows
+        KSP Object: (physical_pc_bddc_coarse_redundant_) 1 MPI process
+          type: preonly
+          maximum iterations=10000, initial guess is zero
+          tolerances: relative=1e-05, absolute=1e-50, divergence=10000.
+          left preconditioning
+          using NONE norm type for convergence test
+        PC Object: (physical_pc_bddc_coarse_redundant_) 1 MPI process
+          type: lu
+            out-of-place factorization
+            tolerance for zero pivot 2.22045e-14
+            matrix ordering: nd
+            factor fill ratio given 5., needed 1.12308
+              Factored matrix follows:
+                Mat Object: (physical_pc_bddc_coarse_redundant_) 1 MPI process
+                  type: seqaij
+                  rows=9, cols=9
+                  package used to perform factorization: petsc
+                  total: nonzeros=73, allocated nonzeros=73
+                    using I-node routines: found 3 nodes, limit used is 5
+          linear system matrix = precond matrix:
+          Mat Object: (physical_pc_bddc_coarse_) 1 MPI process
+            type: seqaij
+            rows=9, cols=9
+            total: nonzeros=65, allocated nonzeros=65
+            total number of mallocs used during MatSetValues calls=0
+              using I-node routines: found 5 nodes, limit used is 5
       linear system matrix = precond matrix:
       Mat Object: (physical_pc_bddc_coarse_) 1 MPI process
         type: seqaij
@@ -126,32 +152,6 @@ PC Object: (physical_) 4 MPI processes
         total: nonzeros=65, allocated nonzeros=65
         total number of mallocs used during MatSetValues calls=0
           using I-node routines: found 5 nodes, limit used is 5
-          KSP Object: (physical_pc_bddc_coarse_redundant_) 1 MPI process
-            type: preonly
-            maximum iterations=10000, initial guess is zero
-            tolerances:  relative=1e-05, absolute=1e-50, divergence=10000.
-            left preconditioning
-            using NONE norm type for convergence test
-          PC Object: (physical_pc_bddc_coarse_redundant_) 1 MPI process
-            type: lu
-              out-of-place factorization
-              tolerance for zero pivot 2.22045e-14
-              matrix ordering: nd
-              factor fill ratio given 5., needed 1.12308
-                Factored matrix follows:
-                  Mat Object: (physical_pc_bddc_coarse_redundant_) 1 MPI process
-                    type: seqaij
-                    rows=9, cols=9
-                    package used to perform factorization: petsc
-                    total: nonzeros=73, allocated nonzeros=73
-                      using I-node routines: found 3 nodes, limit used is 5
-            linear system matrix = precond matrix:
-            Mat Object: (physical_pc_bddc_coarse_) 1 MPI process
-              type: seqaij
-              rows=9, cols=9
-              total: nonzeros=65, allocated nonzeros=65
-              total number of mallocs used during MatSetValues calls=0
-                using I-node routines: found 5 nodes, limit used is 5
   linear system matrix = precond matrix:
   Mat Object: 4 MPI processes
     type: is

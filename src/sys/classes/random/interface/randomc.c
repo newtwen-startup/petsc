@@ -34,11 +34,11 @@ PetscErrorCode PetscRandomDestroy(PetscRandom *r)
   PetscFunctionBegin;
   if (!*r) PetscFunctionReturn(PETSC_SUCCESS);
   PetscValidHeaderSpecific(*r, PETSC_RANDOM_CLASSID, 1);
-  if (--((PetscObject)(*r))->refct > 0) {
+  if (--((PetscObject)*r)->refct > 0) {
     *r = NULL;
     PetscFunctionReturn(PETSC_SUCCESS);
   }
-  if ((*r)->ops->destroy) PetscCall((*(*r)->ops->destroy)(*r));
+  PetscTryTypeMethod(*r, destroy);
   PetscCall(PetscHeaderDestroy(r));
   PetscFunctionReturn(PETSC_SUCCESS);
 }

@@ -24,8 +24,8 @@ Input parameters include:\n\
   -init_view         : view initial object setup\n\
   -snes_fd           : snes with finite difference Jacobian (needed for pdipm)\n\
   -snes_compare_explicit : compare user Jacobian with finite difference Jacobian \n\
-  -tao_cmonitor      : convergence monitor with constraint norm \n\
-  -tao_view_solution : view exact solution at each iteration\n\
+  -tao_monitor_constraint_norm : convergence monitor with constraint norm \n\
+  -tao_monitor_solution : view exact solution at each iteration\n\
   Note: external package MUMPS is required to run pdipm in parallel. This is designed for a maximum of 2 processors, the code will error if size > 2.\n";
 
 /*
@@ -481,7 +481,7 @@ PetscErrorCode FormEqualityJacobian(Tao tao, Vec X, Mat JE, Mat JEpre, void *ctx
 
    test:
       args: -tao_converged_reason -tao_gatol 1.e-6 -tao_type pdipm -tao_pdipm_kkt_shift_pd
-      requires: mumps
+      requires: mumps !single
       filter: sed  -e "s/CONVERGED_GATOL iterations *[0-9]\{1,\}/CONVERGED_GATOL/g"
 
    test:
@@ -509,7 +509,7 @@ PetscErrorCode FormEqualityJacobian(Tao tao, Vec X, Mat JE, Mat JEpre, void *ctx
 
    test:
       suffix: 5
-      args: -tao_converged_reason -tao_almm_type classic -no_eq
+      args: -tao_converged_reason -tao_almm_type classic -no_eq -tao_almm_subsolver_tao_max_it 100
       requires: !single !defined(PETSCTEST_VALGRIND)
       filter: sed  -e "s/CONVERGED_GATOL iterations *[0-9]\{1,\}/CONVERGED_GATOL/g"
 

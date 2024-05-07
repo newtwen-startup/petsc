@@ -141,6 +141,7 @@ static PetscErrorCode PetscViewerFileSetName_VTK(PetscViewer viewer, const char 
 static PetscErrorCode PetscViewerFileGetName_VTK(PetscViewer viewer, const char **name)
 {
   PetscViewer_VTK *vtk = (PetscViewer_VTK *)viewer->data;
+
   PetscFunctionBegin;
   *name = vtk->filename;
   PetscFunctionReturn(PETSC_SUCCESS);
@@ -242,9 +243,9 @@ PETSC_EXTERN PetscErrorCode PetscViewerCreate_VTK(PetscViewer v)
 . name - name of file
 - type - type of file
 .vb
-    FILE_MODE_WRITE - create new file for binary output
-    FILE_MODE_READ - open existing file for binary input (not currently supported)
-    FILE_MODE_APPEND - open existing file for binary output (not currently supported)
+  FILE_MODE_WRITE - create new file for binary output
+  FILE_MODE_READ - open existing file for binary input (not currently supported)
+  FILE_MODE_APPEND - open existing file for binary output (not currently supported)
 .ve
 
   Output Parameter:

@@ -32,7 +32,7 @@ static PetscErrorCode PetscPythonFindLibraryName(const char pythonexe[], const c
   PetscCall(PetscStrlcat(command, attempt, sizeof(command)));
 #if defined(PETSC_HAVE_POPEN)
   PetscCall(PetscPOpen(PETSC_COMM_SELF, NULL, command, "r", &fp));
-  PetscCheck(fgets(pythonlib, pl, fp), PETSC_COMM_SELF, PETSC_ERR_PLIB, "Python: bad output from executable: %s\nRunning: %s", pythonexe, command);
+  PetscCheck(fgets(pythonlib, pl, fp), PETSC_COMM_SELF, PETSC_ERR_PLIB, "Python: bad output from executable: %s, running: %s", pythonexe, command);
   PetscCall(PetscPClose(PETSC_COMM_SELF, fp));
 #else
   SETERRQ(PETSC_COMM_SELF, PETSC_ERR_LIB, "Python: Aborted due to missing popen()");
@@ -46,11 +46,15 @@ static PetscErrorCode PetscPythonFindLibraryName(const char pythonexe[], const c
 
 static PetscErrorCode PetscPythonFindLibrary(const char pythonexe[], char pythonlib[], size_t pl)
 {
-  const char cmdline1[] = "-c 'import os, sysconfig; print(os.path.join(sysconfig.get_config_var(\"LIBDIR\"),sysconfig.get_config_var(\"LDLIBRARY\")))'";
-  const char cmdline2[] = "-c 'import os, sysconfig; print(os.path.join(sysconfig.get_path(\"stdlib\"),os.path.pardir,\"libpython\"+sysconfig.get_python_version()+\".dylib\"))'";
-  const char cmdline3[] = "-c 'import os, sysconfig; print(os.path.join(sysconfig.get_config_var(\"LIBPL\"),sysconfig.get_config_var(\"LDLIBRARY\")))'";
-  const char cmdline4[] = "-c 'import sysconfig; print(sysconfig.get_config_var(\"LIBPYTHON\"))'";
-  const char cmdline5[] = "-c 'import os, sysconfig; import sys;print(os.path.join(sysconfig.get_config_var(\"LIBDIR\"),\"libpython\"+sys.version[:3]+\".so\"))'";
+  // clang-format off
+  const char *const cmdlines[] = {"-c 'import os, sysconfig; print(os.path.join(sysconfig.get_config_var(\"LIBDIR\"),sysconfig.get_config_var(\"LDLIBRARY\")))'",
+                                  "-c 'import os, sysconfig; print(os.path.join(sysconfig.get_path(\"stdlib\"),os.path.pardir,\"libpython\"+sysconfig.get_python_version()+\".dylib\"))'",
+                                  "-c 'import os, sysconfig; print(os.path.join(sysconfig.get_path(\"stdlib\"),os.path.pardir,\"libpython\"+sysconfig.get_python_version()+\".so\"))'",
+                                  "-c 'import os, sysconfig; print(os.path.join(sysconfig.get_config_var(\"LIBPL\"),sysconfig.get_config_var(\"LDLIBRARY\")))'",
+                                  "-c 'import sysconfig; print(sysconfig.get_config_var(\"LIBPYTHON\"))'",
+                                  "-c 'import os, sysconfig; print(os.path.join(sysconfig.get_config_var(\"LIBDIR\"),\"libpython\"+sysconfig.get_python_version()+\".dylib\"))'",
+                                  "-c 'import os, sysconfig; print(os.path.join(sysconfig.get_config_var(\"LIBDIR\"),\"libpython\"+sysconfig.get_python_version()+\".so\"))'"};
+  // clang-format on
 
   PetscBool found = PETSC_FALSE;
 
@@ -60,12 +64,12 @@ static PetscErrorCode PetscPythonFindLibrary(const char pythonexe[], char python
   PetscFunctionReturn(PETSC_SUCCESS);
 #endif
 
-  PetscCall(PetscPythonFindLibraryName(pythonexe, cmdline1, pythonlib, pl, &found));
-  if (!found) PetscCall(PetscPythonFindLibraryName(pythonexe, cmdline2, pythonlib, pl, &found));
-  if (!found) PetscCall(PetscPythonFindLibraryName(pythonexe, cmdline3, pythonlib, pl, &found));
-  if (!found) PetscCall(PetscPythonFindLibraryName(pythonexe, cmdline4, pythonlib, pl, &found));
-  if (!found) PetscCall(PetscPythonFindLibraryName(pythonexe, cmdline5, pythonlib, pl, &found));
-  PetscCall(PetscInfo(NULL, "Python library  %s found %d\n", pythonlib, found));
+  for (size_t i = 0; i < PETSC_STATIC_ARRAY_LENGTH(cmdlines); i++) {
+    PetscCall(PetscInfo(NULL, "Looking for Python library with \"%s %s\"\n", pythonexe, cmdlines[i]));
+    PetscCall(PetscPythonFindLibraryName(pythonexe, cmdlines[i], pythonlib, pl, &found));
+    if (found) break;
+  }
+  PetscCall(PetscInfo(NULL, "Python library %s found %d\n", pythonlib, found));
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
@@ -195,11 +199,11 @@ PetscErrorCode PetscPythonInitialize(const char pyexe[], const char pylib[])
     char             path[PETSC_MAX_PATH_LEN] = {0};
 
     /* initialize Python. Py_InitializeEx() prints an error and EXITS the program if it is not successful! */
-    PetscCall(PetscInfo(NULL, "Calling Py_InitializeEx(0);\n"));
-    Py_InitializeEx(0); /* 0: do not install signal handlers */
-    PetscCall(PetscInfo(NULL, "Py_InitializeEx(0) called successfully;\n"));
+    PetscCall(PetscInfo(NULL, "Calling Py_InitializeEx(0)\n"));
+    PetscStackCallExternalVoid("Py_InitializeEx", Py_InitializeEx(0)); /* 0: do not install signal handlers */
+    PetscCall(PetscInfo(NULL, "Py_InitializeEx(0) called successfully\n"));
 
-    /*  build 'sys.argv' list */
+    /* build 'sys.argv' list */
     py_version = Py_GetVersion();
     if (py_version[0] == '2') {
       int   argc    = 0;
@@ -231,15 +235,18 @@ PetscErrorCode PetscPythonInitialize(const char pyexe[], const char pylib[])
       registered = PETSC_TRUE;
     }
     PetscBeganPython = PETSC_TRUE;
-    PetscCall(PetscInfo(NULL, "Python initialize completed.\n"));
+    PetscCall(PetscInfo(NULL, "Python initialize completed\n"));
   }
   /* import 'petsc4py.PETSc' module */
-  module = PyImport_ImportModule("petsc4py.PETSc");
+  PetscCall(PetscFPTrapPush(PETSC_FP_TRAP_OFF));
+  PetscStackCallExternalVoid("PyImport_ImportModule", module = PyImport_ImportModule("petsc4py.PETSc"));
+  PetscCall(PetscFPTrapPop());
   if (module) {
-    PetscCall(PetscInfo(NULL, "Python: successfully imported  module 'petsc4py.PETSc'\n"));
+    PetscCall(PetscInfo(NULL, "Python: successfully imported module 'petsc4py.PETSc'\n"));
     Py_DecRef(module);
     module = NULL;
   } else {
+    PetscCall(PetscInfo(NULL, "Python: error when importing module 'petsc4py.PETSc'\n"));
     PetscCall(PetscPythonPrintError());
     SETERRQ(PETSC_COMM_SELF, PETSC_ERR_PLIB, "Python: could not import module 'petsc4py.PETSc', perhaps your PYTHONPATH does not contain it");
   }

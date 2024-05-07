@@ -1,5 +1,4 @@
 #include <petsc/private/dmnetworkimpl.h> /*I  "petscdmnetwork.h"  I*/
-#include "petscis.h"
 
 PetscLogEvent DMNetwork_LayoutSetUp;
 PetscLogEvent DMNetwork_SetUpNetwork;
@@ -38,7 +37,6 @@ PetscErrorCode DMNetworkInitializeHeaderComponentData(DM dm)
       network->header[p].maxcomps = defaultnumcomp;
       PetscCall(SetUpNetworkHeaderComponentValue(dm, &network->header[p], &network->cvalue[p]));
     }
-
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
@@ -67,7 +65,7 @@ PetscErrorCode DMNetworkGetPlex(DM dm, DM *plexdm)
 }
 
 /*@
-  DMNetworkGetNumSubNetworks - Gets the the number of subnetworks
+  DMNetworkGetNumSubNetworks - Gets the number of subnetworks
 
   Not Collective
 
@@ -586,9 +584,7 @@ static PetscErrorCode GetEdgelist_Coupling(DM dm, PetscInt *edges, PetscInt *nme
       }
     }
   }
-#if defined(PETSC_USE_DEBUG)
-  PetscCheck(i == network->cloneshared->nVertices, PETSC_COMM_SELF, PETSC_ERR_ARG_NULL, "%" PetscInt_FMT " != %" PetscInt_FMT " nVertices", i, network->cloneshared->nVertices);
-#endif
+  PetscAssert(i == network->cloneshared->nVertices, PETSC_COMM_SELF, PETSC_ERR_ARG_NULL, "%" PetscInt_FMT " != %" PetscInt_FMT " nVertices", i, network->cloneshared->nVertices);
 
   /* (2.3) Shared vertices in the subnetworks are merged, update global NVertices: np = sum(local nmerged) */
   PetscCall(MPIU_Allreduce(&nmerged, &np, 1, MPIU_INT, MPI_SUM, comm));
@@ -723,10 +719,10 @@ PetscErrorCode DMNetworkLayoutSetUp(DM dm)
   network->cloneshared->subnetvtx  = subnetvtx;
   for (j = 0; j < Nsubnet; j++) {
     network->cloneshared->subnet[j].edges = subnetedge;
-    subnetedge += network->cloneshared->subnet[j].nedge;
+    subnetedge                            = PetscSafePointerPlusOffset(subnetedge, network->cloneshared->subnet[j].nedge);
 
     network->cloneshared->subnet[j].vertices = subnetvtx;
-    subnetvtx += network->cloneshared->subnet[j].nvtx;
+    subnetvtx                                = PetscSafePointerPlusOffset(subnetvtx, network->cloneshared->subnet[j].nvtx);
   }
   network->cloneshared->svertices = subnetvtx;
 
@@ -1487,7 +1483,6 @@ PetscErrorCode DMNetworkGetComponent(DM dm, PetscInt p, PetscInt compnum, PetscI
   }
 
   if (nvar) *nvar = header->nvar[compnum];
-
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
@@ -1634,9 +1629,9 @@ PetscErrorCode DMNetworkAssembleGraphStructures(DM dm)
   if (size > 1) {
     PetscCall(PetscSFGetSubSF(network->plex->sf, network->vertex.mapping, &network->vertex.sf));
 
-    PetscCall(PetscSectionCreateGlobalSection(network->vertex.DofSection, network->vertex.sf, PETSC_FALSE, PETSC_FALSE, &network->vertex.GlobalDofSection));
+    PetscCall(PetscSectionCreateGlobalSection(network->vertex.DofSection, network->vertex.sf, PETSC_TRUE, PETSC_FALSE, PETSC_FALSE, &network->vertex.GlobalDofSection));
     PetscCall(PetscSFGetSubSF(network->plex->sf, network->edge.mapping, &network->edge.sf));
-    PetscCall(PetscSectionCreateGlobalSection(network->edge.DofSection, network->edge.sf, PETSC_FALSE, PETSC_FALSE, &network->edge.GlobalDofSection));
+    PetscCall(PetscSectionCreateGlobalSection(network->edge.DofSection, network->edge.sf, PETSC_TRUE, PETSC_FALSE, PETSC_FALSE, &network->edge.GlobalDofSection));
   } else {
     /* create structures for vertex */
     PetscCall(PetscSectionClone(network->vertex.DofSection, &network->vertex.GlobalDofSection));
@@ -2950,8 +2945,8 @@ PetscErrorCode DMNetworkSetVertexLocalToGlobalOrdering(DM dm)
   PetscCall(VecSetFromOptions(Vleaves));
   PetscCall(VecGetArray(Vleaves, &varr));
   for (i = 0; i < nleaves; i++) {
-    varr[2 * i]     = (PetscScalar)(iremote[i].rank);  /* rank of remote process */
-    varr[2 * i + 1] = (PetscScalar)(iremote[i].index); /* local index in remote process */
+    varr[2 * i]     = (PetscScalar)iremote[i].rank;  /* rank of remote process */
+    varr[2 * i + 1] = (PetscScalar)iremote[i].index; /* local index in remote process */
   }
   PetscCall(VecRestoreArray(Vleaves, &varr));
 

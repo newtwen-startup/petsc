@@ -405,7 +405,6 @@
       PetscCall(VecZeroEntries(Xsub(2),ierr))
       PetscCall(DMCompositeRestoreAccessArray(solver%da,Xnest,itwo,PETSC_NULL_INTEGER,Xsub,ierr))
 
-      return
       end subroutine FormInitialGuess
 
 ! ---------------------------------------------------------------------
@@ -460,7 +459,6 @@
          PetscCall(VecSetValues(X1,ione,row,v,INSERT_VALUES,ierr))
  20   continue
 
-      return
       end subroutine InitialGuessLocal
 
 ! ---------------------------------------------------------------------
@@ -517,7 +515,6 @@
 !     matrix. If we do it will generate an error.
       PetscCall(MatSetOption(jac_prec,MAT_NEW_NONZERO_LOCATION_ERR,PETSC_TRUE,ierr))
 
-      return
       end subroutine FormJacobian
 
 ! ---------------------------------------------------------------------
@@ -603,7 +600,6 @@
 
       PetscCall(VecRestoreArrayReadF90(X1,lx_v,ierr))
 
-      return
       end subroutine FormJacobianLocal
 
 ! ---------------------------------------------------------------------
@@ -653,7 +649,6 @@
 
       PetscCall(DMCompositeRestoreAccessArray(solver%da,X,itwo,PETSC_NULL_INTEGER,Xsub,ierr))
       PetscCall(DMCompositeRestoreAccessArray(solver%da,F,itwo,PETSC_NULL_INTEGER,Fsub,ierr))
-      return
       end subroutine formfunction
 
 ! ---------------------------------------------------------------------
@@ -714,7 +709,6 @@
       PetscCall(VecAssemblyEnd(F1,ierr))
 
       ierr = 0
-      return
       end subroutine FormFunctionNLTerm
 
 !/*TEST
@@ -724,6 +718,6 @@
 !
 !   test:
 !      nsize: 4
-!      args: -par 5.0 -da_grid_x 10 -da_grid_y 10 -snes_monitor_short -snes_linesearch_type basic -snes_converged_reason -ksp_type fgmres -ksp_norm_type unpreconditioned -pc_type fieldsplit -pc_fieldsplit_type schur -pc_fieldsplit_schur_fact_type upper -ksp_monitor_short -fieldsplit_lambda_ksp_type preonly -fieldsplit_lambda_pc_type jacobi -fieldsplit_phi_pc_type gamg -fieldsplit_phi_pc_gamg_esteig_ksp_type cg -fieldsplit_phi_pc_gamg_esteig_ksp_max_it 10  -fieldsplit_phi_pc_gamg_agg_nsmooths 1 -fieldsplit_phi_pc_gamg_threshold 0.
+!      args: -par 5.0 -da_grid_x 10 -da_grid_y 10 -snes_monitor_short -snes_linesearch_type basic -snes_converged_reason -ksp_type fgmres -ksp_norm_type unpreconditioned -pc_type fieldsplit -pc_fieldsplit_type schur -pc_fieldsplit_schur_fact_type upper -ksp_monitor_short -fieldsplit_lambda_ksp_type preonly -fieldsplit_lambda_pc_type jacobi -fieldsplit_phi_pc_type gamg -fieldsplit_phi_pc_gamg_esteig_ksp_type cg -fieldsplit_phi_pc_gamg_esteig_ksp_max_it 10 -fieldsplit_phi_pc_gamg_agg_nsmooths 1 -fieldsplit_phi_pc_gamg_threshold 0.
 !
 !TEST*/

@@ -11,8 +11,8 @@
 . tensor      - Flag to create tensor produt cells
 . symmetric   - Flag to extrude symmetrically about the surface
 . periodic    - Flag to extrude periodically
-. normal      - Surface normal vector, or NULL
-- thicknesses - Thickness of each layer, or NULL
+. normal      - Surface normal vector, or `NULL`
+- thicknesses - Thickness of each layer, or `NULL`
 
   Output Parameter:
 . edm - The volumetric mesh
@@ -57,6 +57,7 @@ PetscErrorCode DMPlexExtrude(DM dm, PetscInt layers, PetscReal thickness, PetscB
   const char     *prefix;
   PetscOptions    options;
   PetscBool       useCeed;
+  PetscBool       cutMarker = PETSC_FALSE;
 
   PetscFunctionBegin;
   PetscCall(DMPlexTransformCreate(PetscObjectComm((PetscObject)dm), &tr));
@@ -81,6 +82,35 @@ PetscErrorCode DMPlexExtrude(DM dm, PetscInt layers, PetscReal thickness, PetscB
   PetscCall(DMPlexGetUseCeed(dm, &useCeed));
   PetscCall(DMPlexSetUseCeed(*edm, useCeed));
   PetscCall(DMCopyDisc(dm, *edm));
+  // Handle periodic viewing
+  PetscCall(PetscOptionsGetBool(options, ((PetscObject)dm)->prefix, "-dm_plex_periodic_cut", &cutMarker, NULL));
+  PetscCall(DMPlexTransformExtrudeGetPeriodic(tr, &periodic));
+  if (periodic && cutMarker) {
+    DMLabel  cutLabel;
+    PetscInt dim, pStart, pEnd;
+
+    PetscCall(DMGetDimension(dm, &dim));
+    PetscCall(DMCreateLabel(*edm, "periodic_cut"));
+    PetscCall(DMGetLabel(*edm, "periodic_cut", &cutLabel));
+    PetscCall(DMPlexGetChart(dm, &pStart, &pEnd));
+    for (PetscInt p = pStart; p < pEnd; ++p) {
+      DMPolytopeType  ct;
+      DMPolytopeType *rct;
+      PetscInt       *rsize, *rcone, *rornt;
+      PetscInt        Nct;
+
+      PetscCall(DMPlexGetCellType(dm, p, &ct));
+      PetscCall(DMPlexTransformCellTransform(tr, ct, p, NULL, &Nct, &rct, &rsize, &rcone, &rornt));
+      for (PetscInt n = 0; n < Nct; ++n) {
+        PetscInt pNew, pdim = DMPolytopeTypeGetDim(rct[n]);
+
+        if (ct == rct[n] || pdim > dim) {
+          PetscCall(DMPlexTransformGetTargetPoint(tr, ct, rct[n], p, 0, &pNew));
+          PetscCall(DMLabelSetValue(cutLabel, pNew, !pdim ? 1 : 2));
+        }
+      }
+    }
+  }
   // It is too hard to raise the dimension of a discretization, so just remake it
   PetscCall(DMGetCoordinateDM(dm, &cdm));
   PetscCall(DMGetField(cdm, 0, NULL, &disc));
@@ -91,7 +121,7 @@ PetscErrorCode DMPlexExtrude(DM dm, PetscInt layers, PetscReal thickness, PetscB
 
     PetscCall(PetscFEGetBasisSpace((PetscFE)disc, &sp));
     PetscCall(PetscSpaceGetDegree(sp, &deg, NULL));
-    PetscCall(DMPlexCreateCoordinateSpace(*edm, deg, NULL));
+    PetscCall(DMPlexCreateCoordinateSpace(*edm, deg, PETSC_TRUE, NULL));
   }
   PetscCall(DMPlexTransformCreateDiscLabels(tr, *edm));
   PetscCall(DMPlexTransformDestroy(&tr));
@@ -106,7 +136,7 @@ PetscErrorCode DMExtrude_Plex(DM dm, PetscInt layers, DM *edm)
 {
   PetscFunctionBegin;
   PetscCall(DMPlexExtrude(dm, layers, PETSC_DETERMINE, PETSC_TRUE, PETSC_FALSE, PETSC_FALSE, NULL, NULL, edm));
-  PetscCall(DMSetMatType((*edm), dm->mattype));
+  PetscCall(DMSetMatType(*edm, dm->mattype));
   PetscCall(DMViewFromOptions(*edm, NULL, "-check_extrude"));
   PetscFunctionReturn(PETSC_SUCCESS);
 }

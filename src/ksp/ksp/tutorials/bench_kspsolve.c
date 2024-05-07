@@ -296,7 +296,7 @@ PetscErrorCode FillCOO(Mat A, void *ctx)
     coo_v[count] = vcent;
     count++;
   }
-  PetscCheck(count == user->nnz, PETSC_COMM_SELF, PETSC_ERR_USER_INPUT, "Expected %" PetscInt_FMT " nonzeros but got %" PetscInt_FMT " nonzeros in COO format\n", user->nnz, count);
+  PetscCheck(count == user->nnz, PETSC_COMM_SELF, PETSC_ERR_USER_INPUT, "Expected %" PetscInt_FMT " nonzeros but got %" PetscInt_FMT " nonzeros in COO format", user->nnz, count);
   PetscCall(MatSetPreallocationCOO(A, user->nnz, coo_i, coo_j));
   PetscCall(MatSetValuesCOO(A, coo_v, INSERT_VALUES));
   PetscCall(PetscFree3(coo_i, coo_j, coo_v));
@@ -335,8 +335,8 @@ int main(int argc, char **argv)
 
   user.dim   = user.n * user.n * user.n;
   global_nnz = 64 + 27 * (user.n - 2) * (user.n - 2) * (user.n - 2) + 108 * (user.n - 2) * (user.n - 2) + 144 * (user.n - 2);
-  PetscCheck(user.n >= 2, PETSC_COMM_WORLD, PETSC_ERR_USER_INPUT, "Requires at least 2 grid points (-n 2), you specified -n %" PetscInt_FMT "\n", user.n);
-  PetscCheck(user.dim >= user.size, PETSC_COMM_WORLD, PETSC_ERR_USER_INPUT, "MPI size (%d) exceeds the grid size %" PetscInt_FMT " (-n %" PetscInt_FMT ")\n", user.size, user.dim, user.n);
+  PetscCheck(user.n >= 2, PETSC_COMM_WORLD, PETSC_ERR_USER_INPUT, "Requires at least 2 grid points (-n 2), you specified -n %" PetscInt_FMT, user.n);
+  PetscCheck(user.dim >= user.size, PETSC_COMM_WORLD, PETSC_ERR_USER_INPUT, "MPI size (%d) exceeds the grid size %" PetscInt_FMT " (-n %" PetscInt_FMT ")", user.size, user.dim, user.n);
   PetscCall(PetscPrintf(PETSC_COMM_WORLD, "===========================================\n"));
   if (user.matmult) PetscCall(PetscPrintf(PETSC_COMM_WORLD, "Test: MatMult performance - Poisson\n"));
   else PetscCall(PetscPrintf(PETSC_COMM_WORLD, "Test: KSP performance - Poisson\n"));
@@ -505,11 +505,16 @@ int main(int argc, char **argv)
 
   testset:
     args: -print_timing false -its 10 -n 8
-    nsize: {{1 3}}
+    nsize: {{3 5}}
     output_file: output/bench_kspsolve_ksp.out
 
     test:
       suffix: ksp
+
+    test:
+      suffix: nbr
+      requires: defined(PETSC_HAVE_MPI_PERSISTENT_NEIGHBORHOOD_COLLECTIVES)
+      args: -sf_type neighbor -sf_neighbor_persistent {{0 1}}
 
     test:
       suffix: hip_ksp
@@ -525,4 +530,10 @@ int main(int argc, char **argv)
       suffix: kok_ksp
       requires: kokkos_kernels
       args: -mat_type aijkokkos
+
+    test:
+      suffix: kok_nbr
+      requires: kokkos_kernels defined(PETSC_HAVE_MPI_PERSISTENT_NEIGHBORHOOD_COLLECTIVES)
+      args: -mat_type aijkokkos -sf_type neighbor -sf_neighbor_persistent {{0 1}}
+
 TEST*/

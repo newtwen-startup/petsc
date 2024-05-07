@@ -38,12 +38,12 @@ PetscErrorCode DMFieldDestroy(DMField *field)
 {
   PetscFunctionBegin;
   if (!*field) PetscFunctionReturn(PETSC_SUCCESS);
-  PetscValidHeaderSpecific((*field), DMFIELD_CLASSID, 1);
-  if (--((PetscObject)(*field))->refct > 0) {
+  PetscValidHeaderSpecific(*field, DMFIELD_CLASSID, 1);
+  if (--((PetscObject)*field)->refct > 0) {
     *field = NULL;
     PetscFunctionReturn(PETSC_SUCCESS);
   }
-  PetscTryTypeMethod((*field), destroy);
+  PetscTryTypeMethod(*field, destroy);
   PetscCall(DMDestroy(&((*field)->dm)));
   PetscCall(PetscHeaderDestroy(field));
   PetscFunctionReturn(PETSC_SUCCESS);
@@ -239,9 +239,7 @@ PetscErrorCode DMFieldEvaluate(DMField field, Vec points, PetscDataType datatype
   if (B) PetscAssertPointer(B, 4);
   if (D) PetscAssertPointer(D, 5);
   if (H) PetscAssertPointer(H, 6);
-  if (field->ops->evaluate) {
-    PetscCall((*field->ops->evaluate)(field, points, datatype, B, D, H));
-  } else SETERRQ(PetscObjectComm((PetscObject)field), PETSC_ERR_SUP, "Not implemented for this type");
+  PetscUseTypeMethod(field, evaluate, points, datatype, B, D, H);
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
@@ -284,9 +282,7 @@ PetscErrorCode DMFieldEvaluateFE(DMField field, IS cellIS, PetscQuadrature point
   if (B) PetscAssertPointer(B, 5);
   if (D) PetscAssertPointer(D, 6);
   if (H) PetscAssertPointer(H, 7);
-  if (field->ops->evaluateFE) {
-    PetscCall((*field->ops->evaluateFE)(field, cellIS, points, datatype, B, D, H));
-  } else SETERRQ(PetscObjectComm((PetscObject)field), PETSC_ERR_SUP, "Not implemented for this type");
+  PetscUseTypeMethod(field, evaluateFE, cellIS, points, datatype, B, D, H);
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
@@ -325,9 +321,7 @@ PetscErrorCode DMFieldEvaluateFV(DMField field, IS cellIS, PetscDataType datatyp
   if (B) PetscAssertPointer(B, 4);
   if (D) PetscAssertPointer(D, 5);
   if (H) PetscAssertPointer(H, 6);
-  if (field->ops->evaluateFV) {
-    PetscCall((*field->ops->evaluateFV)(field, cellIS, datatype, B, D, H));
-  } else SETERRQ(PetscObjectComm((PetscObject)field), PETSC_ERR_SUP, "Not implemented for this type");
+  PetscUseTypeMethod(field, evaluateFV, cellIS, datatype, B, D, H);
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
@@ -360,7 +354,7 @@ PetscErrorCode DMFieldGetDegree(DMField field, IS cellIS, PetscInt *minDegree, P
   if (minDegree) *minDegree = -1;
   if (maxDegree) *maxDegree = PETSC_MAX_INT;
 
-  if (field->ops->getDegree) PetscCall((*field->ops->getDegree)(field, cellIS, minDegree, maxDegree));
+  PetscTryTypeMethod(field, getDegree, cellIS, minDegree, maxDegree);
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
@@ -497,7 +491,7 @@ PetscErrorCode DMFieldCreateFEGeom(DMField field, IS pointIS, PetscQuadrature qu
   PetscCall(PetscFEGeomComplete(g));
   PetscCall(DMFieldGetDegree(field, pointIS, NULL, &maxDegree));
   g->isAffine = (maxDegree <= 1) ? PETSC_TRUE : PETSC_FALSE;
-  if (faceData) PetscCall((*field->ops->computeFaceData)(field, pointIS, quad, g));
+  if (faceData) PetscUseTypeMethod(field, computeFaceData, pointIS, quad, g);
   *geom = g;
   PetscFunctionReturn(PETSC_SUCCESS);
 }

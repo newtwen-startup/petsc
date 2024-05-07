@@ -63,7 +63,7 @@ int main(int argc, char **args)
   PetscCallMPI(MPI_Comm_size(PETSC_COMM_WORLD, &size));
   /*
      Determine files from which we read the linear system
-     (matrix, right-hand-side and initial guess vector).
+     (matrix, right-hand side and initial guess vector).
   */
   PetscCall(PetscOptionsGetString(NULL, NULL, "-f", file, sizeof(file), NULL));
   PetscCall(PetscOptionsGetBool(NULL, NULL, "-truncate", &truncate, NULL));
@@ -427,7 +427,7 @@ int main(int argc, char **args)
      test:
         suffix: 3b
         nsize: {{1 2}separate output}
-        args: -f ${wPETSC_DIR}/share/petsc/datafiles/matrices/tiny_system_with_x0  # this file includes all A, b and x0
+        args: -f ${wPETSC_DIR}/share/petsc/datafiles/matrices/tiny_system_with_x0 # this file includes all A, b and x0
      test:
         # Load square matrix, RHS and initial guess from HDF5 (Version 7.3 MAT-File)
         suffix: 3b_hdf5
@@ -498,7 +498,6 @@ int main(int argc, char **args)
         nsize: 4
         output_file: output/ex27_4f_nonzero.out
         requires: hpddm slepc defined(PETSC_HAVE_DYNAMIC_LIBRARIES) defined(PETSC_USE_SHARED_LIBRARIES)
-        filter: sed -e "s/Number of iterations =   6/Number of iterations =   5/g"
         args: -solve_augmented -nonzero_A11 {{0.0 1e-6}shared output} -ksp_type gmres
         args: -pc_type fieldsplit -pc_fieldsplit_type schur -pc_fieldsplit_schur_precondition self -fieldsplit_0_pc_type jacobi -fieldsplit_ksp_type preonly
         args: -prefix_push fieldsplit_1_ -pc_type hpddm -pc_hpddm_schur_precondition least_squares -pc_hpddm_define_subdomains -pc_hpddm_levels_1_eps_nev 20 -pc_hpddm_levels_1_st_share_sub_ksp -pc_hpddm_levels_1_sub_pc_type cholesky -pc_hpddm_levels_1_eps_gen_non_hermitian -prefix_pop
@@ -602,5 +601,6 @@ int main(int argc, char **args)
      args: -ksp_converged_reason -ksp_rtol 1e-5 -ksp_max_it 100
      args: -ksp_type lsqr -pc_type hpddm -pc_hpddm_define_subdomains -pc_hpddm_levels_1_eps_nev 20 -pc_hpddm_levels_1_eps_threshold 1e-6
      args: -pc_hpddm_levels_1_pc_asm_sub_mat_type aij -pc_hpddm_levels_1_pc_asm_type basic -pc_hpddm_levels_1_sub_pc_type lu -pc_hpddm_coarse_pc_type lu
+     filter: sed -e "s/ 10/ 9/g"
 
 TEST*/

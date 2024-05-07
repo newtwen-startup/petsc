@@ -3,6 +3,10 @@
 #include <petscdevice.h>
 #include <petsc/private/petscimpl.h>
 
+#if defined(PETSC_HAVE_CUPM)
+PETSC_INTERN int PetscDeviceCUPMRuntimeArch; // The real CUDA/HIP arch the code is run with. For log view and error diagnosis
+#endif
+
 /* logging support */
 PETSC_INTERN PetscLogEvent CUBLAS_HANDLE_CREATE;
 PETSC_INTERN PetscLogEvent CUSOLVER_HANDLE_CREATE;
@@ -170,7 +174,7 @@ extern void PetscCheckCompatibleDeviceContexts(T, int, U, int);
 
 #define PETSC_DEVICE_CONTEXT_DEFAULT_DEVICE_TYPE PETSC_DEVICE_HARDWARE_DEFAULT_TYPE
 // REMOVE ME (change)
-#define PETSC_DEVICE_CONTEXT_DEFAULT_STREAM_TYPE PETSC_STREAM_GLOBAL_BLOCKING
+#define PETSC_DEVICE_CONTEXT_DEFAULT_STREAM_TYPE PETSC_STREAM_DEFAULT
 
 typedef struct _DeviceOps *DeviceOps;
 struct _DeviceOps {
@@ -418,12 +422,12 @@ PETSC_INTERN PetscErrorCode PetscDeviceContextCreate_SYCL(PetscDeviceContext);
 PETSC_EXTERN PetscErrorCode PetscGetMarkedObjectMap_Internal(size_t *, PetscObjectId **, PetscMemoryAccessMode **, size_t **, PetscEvent ***);
 PETSC_EXTERN PetscErrorCode PetscRestoreMarkedObjectMap_Internal(size_t, PetscObjectId **, PetscMemoryAccessMode **, size_t **, PetscEvent ***);
 
-static inline PetscErrorCode PetscDeviceContextSynchronizeIfGlobalBlocking_Internal(PetscDeviceContext dctx)
+static inline PetscErrorCode PetscDeviceContextSynchronizeIfWithBarrier_Internal(PetscDeviceContext dctx)
 {
   PetscStreamType stream_type;
 
   PetscFunctionBegin;
   PetscCall(PetscDeviceContextGetStreamType(dctx, &stream_type));
-  if (stream_type == PETSC_STREAM_GLOBAL_BLOCKING) PetscCall(PetscDeviceContextSynchronize(dctx));
+  if (stream_type == PETSC_STREAM_DEFAULT_WITH_BARRIER || stream_type == PETSC_STREAM_NONBLOCKING_WITH_BARRIER) PetscCall(PetscDeviceContextSynchronize(dctx));
   PetscFunctionReturn(PETSC_SUCCESS);
 }

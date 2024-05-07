@@ -144,7 +144,7 @@ int main(int argc, char **argv)
 
   PetscCall(DMSetApplicationContext(da, &user));
   PetscCall(DMDASNESSetFunctionLocal(da, INSERT_VALUES, (PetscErrorCode(*)(DMDALocalInfo *, void *, void *, void *))FormFunctionLocal, &user));
-  PetscCall(DMDASNESSetJacobianLocal(da, (DMDASNESJacobian)FormJacobianLocal, &user));
+  PetscCall(DMDASNESSetJacobianLocal(da, (DMDASNESJacobianFn *)FormJacobianLocal, &user));
   PetscCall(SNESSetFromOptions(snes));
   PetscCall(FormCoordinates(da, &user));
 
@@ -197,9 +197,9 @@ PetscInt OnBoundary(PetscInt i, PetscInt j, PetscInt k, PetscInt mx, PetscInt my
 void BoundaryValue(PetscInt i, PetscInt j, PetscInt k, PetscInt mx, PetscInt my, PetscInt mz, PetscScalar *val, AppCtx *user)
 {
   /* reference coordinates */
-  PetscReal p_x = ((PetscReal)i) / (((PetscReal)(mx - 1)));
-  PetscReal p_y = ((PetscReal)j) / (((PetscReal)(my - 1)));
-  PetscReal p_z = ((PetscReal)k) / (((PetscReal)(mz - 1)));
+  PetscReal p_x = ((PetscReal)i) / ((PetscReal)(mx - 1));
+  PetscReal p_y = ((PetscReal)j) / ((PetscReal)(my - 1));
+  PetscReal p_z = ((PetscReal)k) / ((PetscReal)(mz - 1));
   PetscReal o_x = p_x;
   PetscReal o_y = p_y;
   PetscReal o_z = p_z;
@@ -923,9 +923,9 @@ PetscErrorCode FormCoordinates(DM da, AppCtx *user)
   for (k = zs; k < zs + zm; k++) {
     for (j = ys; j < ys + ym; j++) {
       for (i = xs; i < xs + xm; i++) {
-        PetscReal cx  = ((PetscReal)i) / (((PetscReal)(mx - 1)));
-        PetscReal cy  = ((PetscReal)j) / (((PetscReal)(my - 1)));
-        PetscReal cz  = ((PetscReal)k) / (((PetscReal)(mz - 1)));
+        PetscReal cx  = ((PetscReal)i) / ((PetscReal)(mx - 1));
+        PetscReal cy  = ((PetscReal)j) / ((PetscReal)(my - 1));
+        PetscReal cz  = ((PetscReal)k) / ((PetscReal)(mz - 1));
         PetscReal rad = user->rad + cy * user->height;
         PetscReal ang = (cx - 0.5) * user->arc;
         x[k][j][i][0] = rad * PetscSinReal(ang);
@@ -955,9 +955,9 @@ PetscErrorCode InitialGuess(DM da, AppCtx *user, Vec X)
     for (j = ys; j < ys + ym; j++) {
       for (i = xs; i < xs + xm; i++) {
         /* reference coordinates */
-        PetscReal p_x = ((PetscReal)i) / (((PetscReal)(mx - 1)));
-        PetscReal p_y = ((PetscReal)j) / (((PetscReal)(my - 1)));
-        PetscReal p_z = ((PetscReal)k) / (((PetscReal)(mz - 1)));
+        PetscReal p_x = ((PetscReal)i) / ((PetscReal)(mx - 1));
+        PetscReal p_y = ((PetscReal)j) / ((PetscReal)(my - 1));
+        PetscReal p_z = ((PetscReal)k) / ((PetscReal)(mz - 1));
         PetscReal o_x = p_x;
         PetscReal o_y = p_y;
         PetscReal o_z = p_z;
@@ -1047,7 +1047,7 @@ PetscErrorCode DisplayLine(SNES snes, Vec X)
 
    test:
       suffix: 3
-      args: -da_refine 1 -da_overlap 3 -da_local_subdomains 4 -snes_type aspin -rad 10.0 -young 10. -ploading 0.0 -loading -0.5 -snes_monitor_short -ksp_monitor_short -npc_sub_snes_rtol 1e-2 -ksp_rtol 1e-2 -ksp_max_it 14 -snes_converged_reason -snes_max_linear_solve_fail 100 -snes_max_it 4
+      args: -da_refine 1 -da_overlap 3 -da_local_subdomains 4 -snes_type aspin -rad 10.0 -young 10. -ploading 0.0 -loading -0.5 -snes_monitor_short -ksp_monitor_short -npc_sub_snes_rtol 1e-2 -ksp_rtol 1e-2 -ksp_max_it 14 -snes_converged_reason -snes_max_linear_solve_fail 100 -snes_max_it 4 -npc_sub_ksp_type preonly -npc_sub_pc_type lu
       requires: !single
 
 TEST*/

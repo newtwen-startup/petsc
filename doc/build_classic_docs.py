@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 """ Configure PETSc and build and place the generated manual pages (as .md files) and html source (as .html files)"""
 
 import os
@@ -6,6 +6,7 @@ import errno
 import subprocess
 import shutil
 import argparse
+import re
 
 rawhtml = ['include', 'src']
 petsc_arch = 'arch-classic-docs'
@@ -40,9 +41,10 @@ def main(stage,outdir):
       if 'PETSCBUIDTARBALL' in os.environ:
         command.append('--download-c2html')
         command.append('--download-sowing')
+        c2html = None
+        doctext = None
       else:
         command.append('--with-fc=0')
-        import shutil
         c2html = shutil.which('c2html')
         if c2html: command.append('--with-c2html')
         else:  command.append('--download-c2html')
@@ -56,17 +58,17 @@ def main(stage,outdir):
       subprocess.run(command, cwd=petsc_dir, check=True)
       print("Time: "+str(time.clock_gettime(time.CLOCK_REALTIME) - x))
       print('==================================================================')
+      if not doctext:
+        with open(os.path.join(petsc_dir,petsc_arch,'lib','petsc','conf','petscvariables')) as f:
+          doctext = [line for line in f if line.find('DOCTEXT ') > -1]
+          doctext = re.sub('[ ]*DOCTEXT[ ]*=[ ]*','',doctext[0]).strip('\n').strip()
+      print('Using DOCTEXT:', doctext)
 
-      loc = os.getcwd()
-      command = ['make', 'allmanpages',
-                 'PETSC_DIR=%s' % petsc_dir,
-                 'PETSC_ARCH=%s' % petsc_arch,
-                 'HTMLMAP=%s' % os.path.join(os.getcwd(),'manualpages','htmlmap'),
-                 'LOC=%s' % loc]
+      import build_man_pages
       x = time.clock_gettime(time.CLOCK_REALTIME)
       print('============================================')
-      print('make allmanpages')
-      subprocess.run(command, cwd=petsc_dir, check=True)
+      print('Building all manual pages')
+      build_man_pages.main(petsc_dir,doctext)
       print("Time: "+str(time.clock_gettime(time.CLOCK_REALTIME) - x))
       print('============================================')
 
@@ -90,20 +92,27 @@ def main(stage,outdir):
       x = time.clock_gettime(time.CLOCK_REALTIME)
       print('============================================')
       print('Building manual page indices')
-      build_man_index.main(petsc_dir,loc)
+      build_man_index.main(petsc_dir)
       print("Time: "+str(time.clock_gettime(time.CLOCK_REALTIME) - x))
       print('============================================')
     else:
       if not os.path.isfile(os.path.join(petsc_dir, "configure.log")): raise Exception("Expected PETSc configuration not found")
-      loc = outdir
-      command = ['make', 'c2html',
-                 'PETSC_DIR=%s' % petsc_dir,
-                 'PETSC_ARCH=%s' % petsc_arch,
-                 'HTMLMAP=%s' % os.path.join(os.getcwd(),'manualpages','htmlmap'),
-                 'LOC=%s' % loc]
+      c2html = shutil.which('c2html')
+      if not c2html:
+        with open(os.path.join(petsc_dir,petsc_arch,'lib','petsc','conf','petscvariables')) as f:
+          c2html = [line for line in f if line.find('C2HTML ') > -1]
+          c2html = re.sub('[ ]*C2HTML[ ]*=[ ]*','',c2html[0]).strip('\n').strip()
+      print('Using C2HTML:', c2html)
+      mapnames = shutil.which('mapnames')
+      if not mapnames:
+        with open(os.path.join(petsc_dir,petsc_arch,'lib','petsc','conf','petscvariables')) as f:
+          mapnames = [line for line in f if line.find('MAPNAMES ') > -1]
+          mapnames = re.sub('[ ]*MAPNAMES[ ]*=[ ]*','',mapnames[0]).strip('\n').strip()
+      print('Using MAPNAMES:', mapnames)
+      import build_c2html
       x = time.clock_gettime(time.CLOCK_REALTIME)
       print('============================================')
-      print('make c2html')
-      subprocess.run(command, cwd=petsc_dir, check=True)
+      print('Building c2html')
+      build_c2html.main(petsc_dir,outdir,c2html,mapnames)
       print("Time: "+str(time.clock_gettime(time.CLOCK_REALTIME) - x))
       print('============================================')

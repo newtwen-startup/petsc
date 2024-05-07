@@ -342,6 +342,7 @@ PetscErrorCode MatDiagonalSet(Mat Y, Vec D, InsertMode is)
   PetscFunctionBegin;
   PetscValidHeaderSpecific(Y, MAT_CLASSID, 1);
   PetscValidHeaderSpecific(D, VEC_CLASSID, 2);
+  MatCheckPreallocated(Y, 1);
   PetscCall(MatGetLocalSize(Y, &matlocal, NULL));
   PetscCall(VecGetLocalSize(D, &veclocal));
   PetscCheck(matlocal == veclocal, PETSC_COMM_SELF, PETSC_ERR_ARG_INCOMP, "Number local rows of matrix %" PetscInt_FMT " does not match that of vector for diagonal %" PetscInt_FMT, matlocal, veclocal);
@@ -515,8 +516,8 @@ PetscErrorCode MatFilter(Mat A, PetscReal tol, PetscBool compress, PetscBool kee
     PetscCall(MatRestoreRowUpperTriangular(A));
     PetscCall(PetscFree2(newCols, newVals));
     PetscCall(MatSetOption(A, MAT_NO_OFF_PROC_ENTRIES, flg)); /* reset option to its user-defined value */
-    if (nnz0 > 0) PetscCall(PetscInfo(NULL, "Filtering left %g %% edges in graph\n", 100 * (double)nnz1 / (double)nnz0));
-    else PetscCall(PetscInfo(NULL, "Warning: %d edges to filter with %d rows\n", (int)nnz0, (int)maxRows));
+    if (nnz0 > 0) PetscCall(PetscInfo(NULL, "Filtering left %g%% edges in graph\n", 100 * (double)nnz1 / (double)nnz0));
+    else PetscCall(PetscInfo(NULL, "Warning: %" PetscInt_FMT " edges to filter with %" PetscInt_FMT " rows\n", nnz0, maxRows));
   }
   if (compress && A->ops->eliminatezeros) {
     Mat       B;

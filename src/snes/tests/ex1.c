@@ -147,7 +147,7 @@ int main(int argc, char **argv)
     efficiently using a coloring of the columns of the matrix.
   */
   PetscCall(PetscOptionsGetBool(NULL, NULL, "-snes_fd_coloring", &fd_coloring, NULL));
-  PetscCheck(!matrix_free || !fd_coloring, PETSC_COMM_WORLD, PETSC_ERR_ARG_INCOMP, "Use only one of -snes_mf, -snes_fd_coloring options!\nYou can do -snes_mf_operator -snes_fd_coloring");
+  PetscCheck(!matrix_free || !fd_coloring, PETSC_COMM_WORLD, PETSC_ERR_ARG_INCOMP, "Use only one of -snes_mf, -snes_fd_coloring options! You can do -snes_mf_operator -snes_fd_coloring");
 
   if (fd_coloring) {
     ISColoring  iscoloring;
@@ -468,7 +468,6 @@ PetscErrorCode FormJacobian(SNES snes, Vec X, Mat J, Mat jac, void *ptr)
     PetscCall(MatAssemblyBegin(J, MAT_FINAL_ASSEMBLY));
     PetscCall(MatAssemblyEnd(J, MAT_FINAL_ASSEMBLY));
   }
-
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
@@ -528,6 +527,10 @@ PetscErrorCode postcheck(SNES snes, Vec x, Vec y, Vec w, PetscBool *changed_y, P
       filter: grep -i  "User provided convergence test" > /dev/null  && echo "Found User provided convergence test"
       args: -snes_monitor_short -snes_type newtontr -ksp_gmres_cgs_refinement_type refine_always -use_convergence_test -info
       requires: defined(PETSC_USE_INFO)
+
+   test:
+      suffix: 2c
+      args: -snes_converged_reason -snes_type newtontr -snes_tr_qn {{same different}separate output} -pc_type mat -snes_view -snes_tr_qn_mat_type lmvmdfp -snes_tr_norm_type infinity
 
    test:
       suffix: 3

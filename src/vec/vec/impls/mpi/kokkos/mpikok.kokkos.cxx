@@ -1,7 +1,7 @@
 /*
    This file contains routines for Parallel vector operations.
  */
-
+#include <petsc_kokkos.hpp>
 #include <petscvec_kokkos.hpp>
 #include <petsc/private/deviceimpl.h>
 #include <petsc/private/vecimpl.h>             /* for struct Vec */
@@ -58,6 +58,20 @@ static PetscErrorCode VecMTDot_MPIKokkos(Vec xin, PetscInt nv, const Vec y[], Pe
 {
   PetscFunctionBegin;
   PetscCall(VecMXDot_MPI_Default(xin, nv, y, z, VecMTDot_SeqKokkos));
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
+static PetscErrorCode VecMDot_MPIKokkos_GEMV(Vec xin, PetscInt nv, const Vec y[], PetscScalar *z)
+{
+  PetscFunctionBegin;
+  PetscCall(VecMXDot_MPI_Default(xin, nv, y, z, VecMDot_SeqKokkos_GEMV));
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
+static PetscErrorCode VecMTDot_MPIKokkos_GEMV(Vec xin, PetscInt nv, const Vec y[], PetscScalar *z)
+{
+  PetscFunctionBegin;
+  PetscCall(VecMXDot_MPI_Default(xin, nv, y, z, VecMTDot_SeqKokkos_GEMV));
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
@@ -155,15 +169,14 @@ static PetscErrorCode VecSetValuesCOO_MPIKokkos(Vec x, const PetscScalar v[], In
   }
 
   /* Pack entries to be sent to remote */
-  Kokkos::parallel_for(
-    vecmpi->sendlen, KOKKOS_LAMBDA(const PetscCount i) { sendbuf(i) = vv(Cperm(i)); });
+  Kokkos::parallel_for(Kokkos::RangePolicy<>(PetscGetKokkosExecutionSpace(), 0, vecmpi->sendlen), KOKKOS_LAMBDA(const PetscCount i) { sendbuf(i) = vv(Cperm(i)); });
   PetscCall(PetscSFReduceWithMemTypeBegin(vecmpi->coo_sf, MPIU_SCALAR, PETSC_MEMTYPE_KOKKOS, sendbuf.data(), PETSC_MEMTYPE_KOKKOS, recvbuf.data(), MPI_REPLACE));
 
   if (imode == INSERT_VALUES) PetscCall(VecGetKokkosViewWrite(x, &xv)); /* write vector */
   else PetscCall(VecGetKokkosView(x, &xv));                             /* read & write vector */
 
   Kokkos::parallel_for(
-    m, KOKKOS_LAMBDA(const PetscCount i) {
+    Kokkos::RangePolicy<>(PetscGetKokkosExecutionSpace(), 0, m), KOKKOS_LAMBDA(const PetscCount i) {
       PetscScalar sum = 0.0;
       for (PetscCount k = jmap1(i); k < jmap1(i + 1); k++) sum += vv(perm1(k));
       xv(i) = (imode == INSERT_VALUES ? 0.0 : xv(i)) + sum;
@@ -173,7 +186,7 @@ static PetscErrorCode VecSetValuesCOO_MPIKokkos(Vec x, const PetscScalar v[], In
 
   /* Add received remote entries */
   Kokkos::parallel_for(
-    vecmpi->nnz2, KOKKOS_LAMBDA(PetscCount i) {
+    Kokkos::RangePolicy<>(PetscGetKokkosExecutionSpace(), 0, vecmpi->nnz2), KOKKOS_LAMBDA(PetscCount i) {
       for (PetscCount k = jmap2(i); k < jmap2(i + 1); k++) xv(imap2(i)) += recvbuf(perm2(k));
     });
 
@@ -182,7 +195,7 @@ static PetscErrorCode VecSetValuesCOO_MPIKokkos(Vec x, const PetscScalar v[], In
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
-static PetscErrorCode VecSetOps_MPIKokkos(Vec v)
+PetscErrorCode VecSetOps_MPIKokkos(Vec v)
 {
   PetscFunctionBegin;
   v->ops->abs             = VecAbs_SeqKokkos;
@@ -259,6 +272,63 @@ PETSC_INTERN PetscErrorCode VecConvert_MPI_MPIKokkos_inplace(Vec v)
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
+// Duplicate a VECMPIKOKKOS
+static PetscErrorCode VecDuplicateVecs_MPIKokkos_GEMV(Vec w, PetscInt m, Vec *V[])
+{
+  PetscInt64   lda; // use 64-bit as we will do "m * lda"
+  PetscScalar *array_h, *array_d;
+  PetscLayout  map;
+  Vec_MPI     *wmpi = (Vec_MPI *)w->data;
+
+  PetscFunctionBegin;
+  PetscCall(PetscKokkosInitializeCheck()); // as we'll call kokkos_malloc()
+  if (wmpi->nghost) {                      // currently only do GEMV optimiation for vectors without ghosts
+    w->ops->duplicatevecs = VecDuplicateVecs_Default;
+    PetscCall(VecDuplicateVecs(w, m, V));
+  } else {
+    PetscCall(PetscMalloc1(m, V));
+    PetscCall(VecGetLayout(w, &map));
+    lda = map->n;
+    lda = ((lda + 31) / 32) * 32; // make every vector 32-elements aligned
+
+    // allocate raw arrays on host and device for the whole m vectors
+    PetscCall(PetscCalloc1(m * lda, &array_h));
+#if defined(KOKKOS_ENABLE_DEFAULT_DEVICE_TYPE_HOST)
+    array_d = array_h;
+#else
+    PetscCallCXX(array_d = static_cast<PetscScalar *>(Kokkos::kokkos_malloc("VecDuplicateVecs", sizeof(PetscScalar) * (m * lda))));
+#endif
+
+    // create the m vectors with raw arrays
+    for (PetscInt i = 0; i < m; i++) {
+      Vec v;
+      PetscCall(VecCreateMPIKokkosWithLayoutAndArrays_Private(map, &array_h[i * lda], &array_d[i * lda], &v));
+      PetscCallCXX(static_cast<Vec_Kokkos *>(v->spptr)->v_dual.modify_host()); // as we only init'ed array_h
+      PetscCall(PetscObjectListDuplicate(((PetscObject)w)->olist, &((PetscObject)v)->olist));
+      PetscCall(PetscFunctionListDuplicate(((PetscObject)w)->qlist, &((PetscObject)v)->qlist));
+      v->ops->view          = w->ops->view;
+      v->stash.donotstash   = w->stash.donotstash;
+      v->stash.ignorenegidx = w->stash.ignorenegidx;
+      v->stash.bs           = w->stash.bs;
+      (*V)[i]               = v;
+    }
+
+    // let the first vector own the raw arrays, so when it is destroyed it will free the arrays
+    if (m) {
+      Vec v = (*V)[0];
+
+      static_cast<Vec_MPI *>(v->data)->array_allocated = array_h;
+#if !defined(KOKKOS_ENABLE_DEFAULT_DEVICE_TYPE_HOST)
+      static_cast<Vec_Kokkos *>(v->spptr)->raw_array_d_allocated = array_d;
+#endif
+      // disable replacearray of the first vector, as freeing its memory also frees others in the group.
+      // But replacearray of others is ok, as they don't own their array.
+      if (m > 1) v->ops->replacearray = VecReplaceArray_Default_GEMV_Error;
+    }
+  }
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
 /*MC
    VECMPIKOKKOS - VECMPIKOKKOS = "mpikokkos" - The basic parallel vector, modified to use Kokkos
 
@@ -273,6 +343,8 @@ PetscErrorCode VecCreate_MPIKokkos(Vec v)
 {
   Vec_MPI    *vecmpi;
   Vec_Kokkos *veckok;
+  PetscBool   mdot_use_gemv  = PETSC_TRUE;
+  PetscBool   maxpy_use_gemv = PETSC_FALSE; // default is false as we saw bad performance with vendors' GEMV with tall skinny matrices.
 
   PetscFunctionBegin;
   PetscCall(PetscKokkosInitializeCheck());
@@ -285,6 +357,39 @@ PetscErrorCode VecCreate_MPIKokkos(Vec v)
   veckok         = new Vec_Kokkos(v->map->n, vecmpi->array, NULL); /* Alloc device array but do not init it */
   v->spptr       = static_cast<void *>(veckok);
   v->offloadmask = PETSC_OFFLOAD_KOKKOS;
+  PetscCall(PetscOptionsGetBool(NULL, NULL, "-vec_mdot_use_gemv", &mdot_use_gemv, NULL));
+  PetscCall(PetscOptionsGetBool(NULL, NULL, "-vec_maxpy_use_gemv", &maxpy_use_gemv, NULL));
+
+  // allocate multiple vectors together
+  if (mdot_use_gemv || maxpy_use_gemv) v->ops[0].duplicatevecs = VecDuplicateVecs_MPIKokkos_GEMV;
+
+  if (mdot_use_gemv) {
+    v->ops[0].mdot        = VecMDot_MPIKokkos_GEMV;
+    v->ops[0].mtdot       = VecMTDot_MPIKokkos_GEMV;
+    v->ops[0].mdot_local  = VecMDot_SeqKokkos_GEMV;
+    v->ops[0].mtdot_local = VecMTDot_SeqKokkos_GEMV;
+  }
+
+  if (maxpy_use_gemv) v->ops[0].maxpy = VecMAXPY_SeqKokkos_GEMV;
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
+// Create a VECMPIKOKKOS with layout and arrays
+PetscErrorCode VecCreateMPIKokkosWithLayoutAndArrays_Private(PetscLayout map, const PetscScalar harray[], const PetscScalar darray[], Vec *v)
+{
+  Vec w;
+
+  PetscFunctionBegin;
+  if (map->n > 0) PetscCheck(darray, map->comm, PETSC_ERR_ARG_WRONG, "darray cannot be NULL");
+#if defined(KOKKOS_ENABLE_DEFAULT_DEVICE_TYPE_HOST)
+  PetscCheck(harray == darray, PETSC_COMM_SELF, PETSC_ERR_ARG_WRONG, "harray and darray must be the same");
+#endif
+  PetscCall(VecCreateMPIWithLayoutAndArray_Private(map, harray, &w));
+  PetscCall(PetscObjectChangeTypeName((PetscObject)w, VECMPIKOKKOS)); // Change it to VECKOKKOS
+  PetscCall(VecSetOps_MPIKokkos(w));
+  PetscCallCXX(w->spptr = new Vec_Kokkos(map->n, const_cast<PetscScalar *>(harray), const_cast<PetscScalar *>(darray)));
+  w->offloadmask = PETSC_OFFLOAD_KOKKOS;
+  *v             = w;
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 

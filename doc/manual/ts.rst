@@ -1025,14 +1025,14 @@ integrator (e.g., ``TSGLEE``) provides this information.
 Handling of discontinuities
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-For problems that involve discontinuous right hand sides, one can set an
+For problems that involve discontinuous right-hand sides, one can set an
 “event” function :math:`g(t,u)` for PETSc to detect and locate the times
 of discontinuities (zeros of :math:`g(t,u)`). Events can be defined
 through the event monitoring routine
 
 .. code-block::
 
-   TSSetEventHandler(TS ts,PetscInt nevents,PetscInt *direction,PetscBool *terminate,PetscErrorCode (*eventhandler)(TS,PetscReal,Vec,PetscScalar*,void* eventP),PetscErrorCode (*postevent)(TS,PetscInt,PetscInt[],PetscReal,Vec,PetscBool,void* eventP),void *eventP);
+   TSSetEventHandler(TS ts,PetscInt nevents,PetscInt *direction,PetscBool *terminate,PetscErrorCode (*indicator)(TS,PetscReal,Vec,PetscScalar*,void* eventP),PetscErrorCode (*postevent)(TS,PetscInt,PetscInt[],PetscReal,Vec,PetscBool,void* eventP),void *eventP);
 
 Here, ``nevents`` denotes the number of events, ``direction`` sets the
 type of zero crossing to be detected for an event (+1 for positive
@@ -1042,7 +1042,7 @@ when an event is located, ``eventmonitor`` is a user- defined routine
 that specifies the event description, ``postevent`` is an optional
 user-defined routine to take specific actions following an event.
 
-The arguments to ``eventhandler()`` are the timestep context, current
+The arguments to ``indicator()`` are the timestep context, current
 time, input state :math:`u`, array of event function value, and the
 (optional) user-provided context ``eventP``.
 
@@ -1060,7 +1060,7 @@ Discretized finite element problems often have the form :math:`M \dot u = G(t, u
 Such problems can be solved using ``DMTSSetIFunction()`` with implicit integrators.
 When :math:`M` is nonsingular (i.e., the problem is an ODE, not a DAE), explicit integrators can be applied to :math:`\dot u = M^{-1} G(t, u)` or :math:`\dot u = \hat M^{-1} G(t, u)`, where :math:`\hat M` is the lumped mass matrix.
 While the true mass matrix generally has a dense inverse and thus must be solved iteratively, the lumped mass matrix is diagonal (e.g., computed via collocated quadrature or row sums of :math:`M`).
-To have PETSc create and apply a (lumped) mass matrix automatically, first use ``DMTSSetRHSFunction()` to specify :math:`G` and set a ``PetscFE` using ``DMAddField()`` and ``DMCreateDS()``, then call either ``DMTSCreateRHSMassMatrix()`` or ``DMTSCreateRHSMassMatrixLumped()`` to automatically create the mass matrix and a ``KSP`` that will be used to apply :math:`M^{-1}`.
+To have PETSc create and apply a (lumped) mass matrix automatically, first use ``DMTSSetRHSFunction()`` to specify :math:`G` and set a ``PetscFE`` using ``DMAddField()`` and ``DMCreateDS()``, then call either ``DMTSCreateRHSMassMatrix()`` or ``DMTSCreateRHSMassMatrixLumped()`` to automatically create the mass matrix and a ``KSP`` that will be used to apply :math:`M^{-1}`.
 This ``KSP`` can be customized using the ``"mass_"`` prefix.
 
 .. _section_sa:
@@ -1399,7 +1399,7 @@ Using TChem from PETSc
 
 TChem [6]_ is a package originally developed at Sandia National
 Laboratory that can read in CHEMKIN [7]_ data files and compute the
-right hand side function and its Jacobian for a reaction ODE system. To
+right-hand side function and its Jacobian for a reaction ODE system. To
 utilize PETSc’s ODE solvers for these systems, first install PETSc with
 the additional ``configure`` option ``--download-tchem``. We currently
 provide two examples of its use; one for single cell reaction and one

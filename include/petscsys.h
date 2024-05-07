@@ -278,16 +278,32 @@ M*/
 /*MC
    PETSC_MPI_THREAD_REQUIRED - the required threading support used if PETSc initializes MPI with `MPI_Init_thread()`.
 
+   No Fortran Support
+
    Level: beginner
 
    Note:
-   By default `PETSC_MPI_THREAD_REQUIRED` equals `MPI_THREAD_FUNNELED` when the MPI implementation provides MPI_Init_thread(), otherwise it equals `MPI_THREAD_SINGLE`
+   By default `PETSC_MPI_THREAD_REQUIRED` equals `MPI_THREAD_FUNNELED` when the MPI implementation provides `MPI_Init_thread()`, otherwise it equals `MPI_THREAD_SINGLE`
 
 .seealso: `PetscInitialize()`
 M*/
 PETSC_EXTERN PetscMPIInt PETSC_MPI_THREAD_REQUIRED;
 
+/*MC
+   PetscBeganMPI - indicates if PETSc initialized MPI during `PetscInitialize()` or if MPI was already initialized.
+
+   Synopsis:
+   #include <petscsys.h>
+   PetscBool PetscBeganMPI;
+
+   No Fortran Support
+
+   Level: developer
+
+.seealso: `PetscInitialize()`, `PetscInitializeCalled()`
+M*/
 PETSC_EXTERN PetscBool PetscBeganMPI;
+
 PETSC_EXTERN PetscBool PetscErrorHandlingInitialized;
 PETSC_EXTERN PetscBool PetscInitializeCalled;
 PETSC_EXTERN PetscBool PetscFinalizeCalled;
@@ -834,7 +850,7 @@ M*/
 M*/
 #define PetscNew(b) PetscCalloc1(1, (b))
 
-#define PetscNewLog(o, b) PETSC_DEPRECATED_MACRO(3, 18, 0, "PetscNew()", ) PetscNew((b))
+#define PetscNewLog(o, b) PETSC_DEPRECATED_MACRO(3, 18, 0, "PetscNew()", ) PetscNew(b)
 
 /*MC
    PetscFree - Frees memory
@@ -1158,9 +1174,37 @@ PETSC_EXTERN PetscErrorCode PetscMonitorCompare(PetscErrorCode (*)(void), void *
      These are so that in extern C code we can caste function pointers to non-extern C
    function pointers. Since the regular C++ code expects its function pointers to be C++
 */
-PETSC_EXTERN_TYPEDEF typedef void (**PetscVoidStarFunction)(void);
-PETSC_EXTERN_TYPEDEF typedef void (*PetscVoidFunction)(void);
-PETSC_EXTERN_TYPEDEF typedef PetscErrorCode (*PetscErrorCodeFunction)(void);
+
+/*S
+  PetscVoidFn - A prototype of a void (fn)(void) function
+
+  Level: developer
+
+  Notes:
+  The deprecated `PetscVoidFunction` works as a replacement for `PetscVoidFn` *.
+
+  The deprecated `PetscVoidStarFunction` works as a replacement for `PetscVoidFn` **.
+
+.seealso: `PetscObject`, `PetscObjectDestroy()`
+S*/
+PETSC_EXTERN_TYPEDEF typedef void(PetscVoidFn)(void);
+
+PETSC_EXTERN_TYPEDEF typedef PetscVoidFn  *PetscVoidFunction;
+PETSC_EXTERN_TYPEDEF typedef PetscVoidFn **PetscVoidStarFunction;
+
+/*S
+  PetscErrorCodeFn - A prototype of a PetscErrorCode (fn)(void) function
+
+  Level: developer
+
+  Notes:
+  The deprecated `PetscErrorCodeFunction` works as a replacement for `PetscErrorCodeFn` *.
+
+.seealso: `PetscObject`, `PetscObjectDestroy()`
+S*/
+PETSC_EXTERN_TYPEDEF typedef PetscErrorCode(PetscErrorCodeFn)(void);
+
+PETSC_EXTERN_TYPEDEF typedef PetscErrorCodeFn *PetscErrorCodeFunction;
 
 /*
     Functions that can act on any PETSc object.
@@ -1183,7 +1227,7 @@ PETSC_EXTERN PetscErrorCode PetscObjectCompose(PetscObject, const char[], PetscO
 PETSC_EXTERN PetscErrorCode PetscObjectRemoveReference(PetscObject, const char[]);
 PETSC_EXTERN PetscErrorCode PetscObjectQuery(PetscObject, const char[], PetscObject *);
 PETSC_EXTERN PetscErrorCode PetscObjectComposeFunction_Private(PetscObject, const char[], void (*)(void));
-#define PetscObjectComposeFunction(a, b, ...) PetscObjectComposeFunction_Private((a), (b), (PetscVoidFunction)(__VA_ARGS__))
+#define PetscObjectComposeFunction(a, b, ...) PetscObjectComposeFunction_Private((a), (b), (PetscVoidFn *)(__VA_ARGS__))
 PETSC_EXTERN PetscErrorCode PetscObjectSetFromOptions(PetscObject);
 PETSC_EXTERN PetscErrorCode PetscObjectSetUp(PetscObject);
 PETSC_EXTERN PetscErrorCode PetscObjectSetPrintedOptions(PetscObject);
@@ -1201,7 +1245,7 @@ PETSC_EXTERN PetscErrorCode PetscObjectsListGetGlobalNumbering(MPI_Comm, PetscIn
 PETSC_EXTERN PetscErrorCode PetscMemoryView(PetscViewer, const char[]);
 PETSC_EXTERN PetscErrorCode PetscObjectPrintClassNamePrefixType(PetscObject, PetscViewer);
 PETSC_EXTERN PetscErrorCode PetscObjectView(PetscObject, PetscViewer);
-#define PetscObjectQueryFunction(obj, name, fptr) PetscObjectQueryFunction_Private((obj), (name), (PetscVoidFunction *)(fptr))
+#define PetscObjectQueryFunction(obj, name, fptr) PetscObjectQueryFunction_Private((obj), (name), (PetscVoidFn **)(fptr))
 PETSC_EXTERN PetscErrorCode PetscObjectQueryFunction_Private(PetscObject, const char[], void (**)(void));
 PETSC_EXTERN PetscErrorCode PetscObjectSetOptionsPrefix(PetscObject, const char[]);
 PETSC_EXTERN PetscErrorCode PetscObjectAppendOptionsPrefix(PetscObject, const char[]);
@@ -1271,12 +1315,12 @@ PETSC_EXTERN PetscErrorCode PetscObjectListDuplicate(PetscObjectList, PetscObjec
   link libraries that will be loaded as needed.
 */
 
-#define PetscFunctionListAdd(list, name, fptr) PetscFunctionListAdd_Private((list), (name), (PetscVoidFunction)(fptr))
-PETSC_EXTERN PetscErrorCode PetscFunctionListAdd_Private(PetscFunctionList *, const char[], PetscVoidFunction);
+#define PetscFunctionListAdd(list, name, fptr) PetscFunctionListAdd_Private((list), (name), (PetscVoidFn *)(fptr))
+PETSC_EXTERN PetscErrorCode PetscFunctionListAdd_Private(PetscFunctionList *, const char[], PetscVoidFn *);
 PETSC_EXTERN PetscErrorCode PetscFunctionListDestroy(PetscFunctionList *);
 PETSC_EXTERN PetscErrorCode PetscFunctionListClear(PetscFunctionList);
-#define PetscFunctionListFind(list, name, fptr) PetscFunctionListFind_Private((list), (name), (PetscVoidFunction *)(fptr))
-PETSC_EXTERN PetscErrorCode PetscFunctionListFind_Private(PetscFunctionList, const char[], PetscVoidFunction *);
+#define PetscFunctionListFind(list, name, fptr) PetscFunctionListFind_Private((list), (name), (PetscVoidFn **)(fptr))
+PETSC_EXTERN PetscErrorCode PetscFunctionListFind_Private(PetscFunctionList, const char[], PetscVoidFn **);
 PETSC_EXTERN PetscErrorCode PetscFunctionListPrintTypes(MPI_Comm, FILE *, const char[], const char[], const char[], const char[], PetscFunctionList, const char[], const char[]);
 PETSC_EXTERN PetscErrorCode PetscFunctionListDuplicate(PetscFunctionList, PetscFunctionList *);
 PETSC_EXTERN PetscErrorCode PetscFunctionListView(PetscFunctionList, PetscViewer);
@@ -1480,10 +1524,6 @@ M*/
     #define PETSC_USE_FORTRAN_KERNEL_MULTCRL
   #endif
 
-  #if !defined(PETSC_USE_FORTRAN_KERNEL_MULTAIJPERM)
-    #define PETSC_USE_FORTRAN_KERNEL_MULTAIJPERM
-  #endif
-
   #if !defined(PETSC_USE_FORTRAN_KERNEL_MULTAIJ)
     #define PETSC_USE_FORTRAN_KERNEL_MULTAIJ
   #endif
@@ -1492,20 +1532,12 @@ M*/
     #define PETSC_USE_FORTRAN_KERNEL_MULTTRANSPOSEAIJ
   #endif
 
-  #if !defined(PETSC_USE_FORTRAN_KERNEL_NORM)
-    #define PETSC_USE_FORTRAN_KERNEL_NORM
-  #endif
-
   #if !defined(PETSC_USE_FORTRAN_KERNEL_MAXPY)
     #define PETSC_USE_FORTRAN_KERNEL_MAXPY
   #endif
 
   #if !defined(PETSC_USE_FORTRAN_KERNEL_SOLVEAIJ)
     #define PETSC_USE_FORTRAN_KERNEL_SOLVEAIJ
-  #endif
-
-  #if !defined(PETSC_USE_FORTRAN_KERNEL_RELAXAIJ)
-    #define PETSC_USE_FORTRAN_KERNEL_RELAXAIJ
   #endif
 
   #if !defined(PETSC_USE_FORTRAN_KERNEL_SOLVEBAIJ)
@@ -2080,6 +2112,19 @@ PETSC_EXTERN PetscErrorCode PetscMkdir(const char[]);
 PETSC_EXTERN PetscErrorCode PetscMkdtemp(char[]);
 PETSC_EXTERN PetscErrorCode PetscRMTree(const char[]);
 
+/*MC
+   PetscBinaryBigEndian - indicates if values in memory are stored with big endian format
+
+   Synopsis:
+   #include <petscsys.h>
+   PetscBool PetscBinaryBigEndian(void);
+
+   No Fortran Support
+
+   Level: developer
+
+.seealso: `PetscInitialize()`, `PetscFinalize()`, `PetscInitializeCalled`
+M*/
 static inline PetscBool PetscBinaryBigEndian(void)
 {
   long _petsc_v = 1;
@@ -2196,9 +2241,32 @@ PETSC_EXTERN PetscErrorCode PetscSegBufferExtractInPlace(PetscSegBuffer, void *)
 PETSC_EXTERN PetscErrorCode PetscSegBufferGetSize(PetscSegBuffer, size_t *);
 PETSC_EXTERN PetscErrorCode PetscSegBufferUnuse(PetscSegBuffer, size_t);
 
-/* Type-safe wrapper to encourage use of PETSC_RESTRICT. Does not use PetscFunctionBegin because the error handling
- * prevents the compiler from completely erasing the stub. This is called in inner loops so it has to be as fast as
- * possible. */
+/*MC
+  PetscSegBufferGetInts - access an array of `PetscInt` from a `PetscSegBuffer`
+
+  Synopsis:
+  #include <petscsys.h>
+  PetscErrorCode PetscSegBufferGetInts(PetscSegBuffer seg, size_t count, PetscInt *PETSC_RESTRICT *slot);
+
+  No Fortran Support
+
+  Input Parameters:
++ seg   - `PetscSegBuffer` buffer
+- count - number of entries needed
+
+  Output Parameter:
+. buf - address of new buffer for contiguous data
+
+  Level: intermediate
+
+  Developer Note:
+  Type-safe wrapper to encourage use of PETSC_RESTRICT. Does not use PetscFunctionBegin because the error handling
+  prevents the compiler from completely erasing the stub. This is called in inner loops so it has to be as fast as
+  possible.
+
+.seealso: `PetscSegBuffer`, `PetscSegBufferGet()`, `PetscInitialize()`, `PetscFinalize()`, `PetscInitializeCalled`
+M*/
+/* */
 static inline PetscErrorCode PetscSegBufferGetInts(PetscSegBuffer seg, size_t count, PetscInt *PETSC_RESTRICT *slot)
 {
   return PetscSegBufferGet(seg, count, (void **)slot);
@@ -2343,3 +2411,17 @@ PETSC_EXTERN PetscErrorCode PCMPICommsDestroy(void);
 PETSC_EXTERN PetscBool      PCMPIServerActive;
 
 #define PETSC_HAVE_FORTRAN PETSC_DEPRECATED_MACRO(3, 20, 0, "PETSC_USE_FORTRAN_BINDINGS", ) PETSC_USE_FORTRAN_BINDINGS
+
+PETSC_EXTERN PetscErrorCode PetscBLASSetNumThreads(PetscInt);
+PETSC_EXTERN PetscErrorCode PetscBLASGetNumThreads(PetscInt *);
+
+/*MC
+   PetscSafePointerPlusOffset - Checks that a pointer is not `NULL` before applying an offset
+
+   Level: beginner
+
+   Note:
+   This is needed to avoid errors with undefined-behavior sanitizers such as
+   UBSan, assuming PETSc has been configured with `-fsanitize=undefined` as part of the compiler flags
+M*/
+#define PetscSafePointerPlusOffset(ptr, offset) ((ptr) ? (ptr) + (offset) : NULL)

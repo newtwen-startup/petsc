@@ -603,7 +603,7 @@ static PetscErrorCode PetscViewerFileSetName_GLVis(PetscViewer viewer, const cha
 + -glvis_precision <precision> - Sets number of digits for floating point values
 . -glvis_size <width,height>   - Sets the window size (in pixels)
 . -glvis_pause <pause>         - Sets time (in seconds) that the program pauses after each visualization
-       (0 is default, -1 implies every visualization)
+                                 (0 is default, -1 implies every visualization)
 . -glvis_keys                  - Additional keys to configure visualization
 - -glvis_exec                  - Additional commands to configure visualization
 
@@ -702,6 +702,9 @@ PetscViewer PETSC_VIEWER_GLVIS_(MPI_Comm comm)
     ierr = PetscError(PETSC_COMM_SELF, __LINE__, "PETSC_VIEWER_GLVIS_", __FILE__, PETSC_ERR_PLIB, PETSC_ERROR_INITIAL, " ");
     PetscFunctionReturn(NULL);
   }
+
+  ((PetscObject)viewer)->persistent = PETSC_TRUE;
+
   ierr = PetscObjectRegisterDestroy((PetscObject)viewer);
   if (ierr) {
     ierr = PetscError(PETSC_COMM_SELF, __LINE__, "PETSC_VIEWER_GLVIS_", __FILE__, PETSC_ERR_PLIB, PETSC_ERROR_INITIAL, " ");

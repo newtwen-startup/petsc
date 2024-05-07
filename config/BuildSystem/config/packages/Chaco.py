@@ -10,10 +10,10 @@ class Configure(config.package.Package):
     self.functions         = ['interface']
     self.includes          = [] #Chaco does not have an include file
     self.liblist           = [['libchaco.a']]
-    self.license           = 'http://www.cs.sandia.gov/web1400/1400_download.html'
     self.downloadonWindows = 1
-    self.requires32bitint  = 1;  # 1 means that the package will not work with 64-bit integers
+    self.requires32bitint  = 1   # 1 means that the package will not work with 64-bit integers
     self.hastests          = 1
+    self.requirekandr      = 1
     return
 
   def setupDependencies(self, framework):

@@ -13,7 +13,7 @@ int main(int argc, char **args)
   PetscCall(PetscViewerPushFormat(viewer, format));
   PetscCall(PetscViewerView(viewer, PETSC_VIEWER_STDOUT_WORLD));
   PetscCall(PetscViewerPopFormat(viewer));
-  PetscCall(PetscViewerDestroy(&viewer));
+  PetscCall(PetscOptionsRestoreViewer(&viewer));
   PetscCall(PetscFinalize());
   return 0;
 }
@@ -28,9 +28,9 @@ int main(int argc, char **args)
       requires: hdf5
       test:
         suffix: 2a
-        args: -viewer_hdf5_base_dimension2 false -viewer_hdf5_sp_output true  -viewer_hdf5_collective false
+        args: -viewer_hdf5_base_dimension2 false -viewer_hdf5_sp_output true -viewer_hdf5_collective false
       test:
         suffix: 2b
-        args: -viewer_hdf5_base_dimension2 true  -viewer_hdf5_sp_output false -viewer_hdf5_collective true
+        args: -viewer_hdf5_base_dimension2 true -viewer_hdf5_sp_output false -viewer_hdf5_collective true
 
 TEST*/

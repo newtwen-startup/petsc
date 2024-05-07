@@ -1,5 +1,4 @@
-#!/usr/bin/env python
-#!/bin/env python
+#!/usr/bin/env python3
 #
 #    Generates etag and ctag (use -noctags to skip generation of ctags) files for PETSc
 #    Adds file names to list of tags in a TAGS file
@@ -173,7 +172,7 @@ def main(ctags):
     ctagfile = None
   flist = []
   if os.path.isdir('.git'):
-    output = check_output('git ls-files | grep -E -v \(^\(systems/\|share/petsc/datafiles/\)\|/output/\|\.\(png\|pdf\|ps\|ppt\|jpg\)$\)', shell=True)
+    output = check_output(r'git ls-files | grep -E -v \(^\(systems/\|share/petsc/datafiles/\)\|/output/\|\.\(png\|pdf\|ps\|ppt\|jpg\)$\)', shell=True)
     flist = output.decode(sys.getfilesystemencoding()).splitlines()
   else:
     for dirpath, dirnames, filenames in os.walk(os.getcwd()):

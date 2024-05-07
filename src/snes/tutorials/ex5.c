@@ -165,7 +165,7 @@ static PetscErrorCode ZeroBCSolution(AppCtx *user, const DMDACoor2d *c, PetscSca
 
      f(x,y) = -u_xx - u_yy - lambda exp(u)
 
-  such that u(x,y) is an exact solution with f(x,y) as the right hand side forcing term.
+  such that u(x,y) is an exact solution with f(x,y) as the right-hand side forcing term.
  */
 static PetscErrorCode MMSSolution1(AppCtx *user, const DMDACoor2d *c, PetscScalar *u)
 {
@@ -359,7 +359,7 @@ static PetscErrorCode FormObjectiveLocal(DMDALocalInfo *info, PetscScalar **x, P
     }
   }
   PetscCall(PetscLogFlops(12.0 * info->ym * info->xm));
-  PetscCall(MPIU_Allreduce(&lobj, obj, 1, MPIU_REAL, MPIU_SUM, comm));
+  *obj = lobj;
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
@@ -697,12 +697,12 @@ int main(int argc, char **argv)
   default:
     SETERRQ(PETSC_COMM_WORLD, PETSC_ERR_USER, "Unknown MMS type %" PetscInt_FMT, MMS);
   }
-  PetscCall(DMDASNESSetFunctionLocal(da, INSERT_VALUES, (DMDASNESFunction)FormFunctionLocal, &user));
+  PetscCall(DMDASNESSetFunctionLocal(da, INSERT_VALUES, (DMDASNESFunctionFn *)FormFunctionLocal, &user));
   PetscCall(PetscOptionsGetBool(NULL, NULL, "-fd", &flg, NULL));
-  if (!flg) PetscCall(DMDASNESSetJacobianLocal(da, (DMDASNESJacobian)FormJacobianLocal, &user));
+  if (!flg) PetscCall(DMDASNESSetJacobianLocal(da, (DMDASNESJacobianFn *)FormJacobianLocal, &user));
 
   PetscCall(PetscOptionsGetBool(NULL, NULL, "-obj", &flg, NULL));
-  if (flg) PetscCall(DMDASNESSetObjectiveLocal(da, (DMDASNESObjective)FormObjectiveLocal, &user));
+  if (flg) PetscCall(DMDASNESSetObjectiveLocal(da, (DMDASNESObjectiveFn *)FormObjectiveLocal, &user));
 
   if (PetscDefined(HAVE_MATLAB)) {
     PetscBool matlab_function = PETSC_FALSE;
@@ -860,7 +860,7 @@ int main(int argc, char **argv)
    test:
      suffix: 5_aspin
      nsize: 4
-     args: -snes_monitor_short -ksp_monitor_short -snes_converged_reason -da_refine 4 -da_overlap 3 -snes_type aspin -snes_view
+     args: -snes_monitor_short -ksp_monitor_short -snes_converged_reason -da_refine 4 -da_overlap 3 -snes_type aspin -snes_view -npc_sub_pc_type lu -npc_sub_ksp_type preonly
 
    test:
      suffix: 5_broyden

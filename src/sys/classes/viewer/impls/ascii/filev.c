@@ -23,7 +23,7 @@ static PetscErrorCode PetscViewerFileClose_ASCII(PetscViewer viewer)
       PetscCall(PetscStrlcat(par, vascii->filename, sizeof(par)));
 #if defined(PETSC_HAVE_POPEN)
       PetscCall(PetscPOpen(PETSC_COMM_SELF, NULL, par, "r", &fp));
-      PetscCheck(!fgets(buf, 1024, fp), PETSC_COMM_SELF, PETSC_ERR_LIB, "Error from compression command %s\n%s", par, buf);
+      PetscCheck(!fgets(buf, 1024, fp), PETSC_COMM_SELF, PETSC_ERR_LIB, "Error from compression command %s %s", par, buf);
       PetscCall(PetscPClose(PETSC_COMM_SELF, fp));
 #else
       SETERRQ(PETSC_COMM_SELF, PETSC_ERR_SUP_SYS, "Cannot run external programs on this machine");
@@ -198,6 +198,7 @@ PetscErrorCode PetscViewerASCIIGetPointer(PetscViewer viewer, FILE **fd)
   PetscViewer_ASCII *vascii = (PetscViewer_ASCII *)viewer->data;
 
   PetscFunctionBegin;
+  PetscCheck(!vascii->fileunit, PetscObjectComm((PetscObject)viewer), PETSC_ERR_ARG_WRONGSTATE, "Cannot request file pointer for viewers that use Fortran files");
   *fd = vascii->fd;
   PetscFunctionReturn(PETSC_SUCCESS);
 }
@@ -506,11 +507,13 @@ PetscErrorCode PetscViewerASCIIUseTabs(PetscViewer viewer, PetscBool flg)
 
   #if defined(PETSC_HAVE_FORTRAN_CAPS)
     #define petscviewerasciiopenwithfileunit_ PETSCVIEWERASCIIOPENWITHFILEUNIT
-    #define petscviewerasciisetfilefileunit_  PETSCVIEWERASCIISETFILEUNIT
+    #define petscviewerasciisetfileunit_      PETSCVIEWERASCIISETFILEUNIT
+    #define petscviewerasciiworldsetfileunit_ PETSCVIEWERASCIIWORLDSETFILEUNIT
     #define petscfortranprinttounit_          PETSCFORTRANPRINTTOUNIT
   #elif !defined(PETSC_HAVE_FORTRAN_UNDERSCORE)
     #define petscviewerasciiopenwithfileunit_ petscviewerasciiopenwithfileunit
     #define petscviewerasciisetfileunit_      petscviewerasciisetfileunit
+    #define petscviewerasciiworldsetfileunit_ petscviewerasciiworldsetfileunit
     #define petscfortranprinttounit_          petscfortranprinttounit
   #endif
 
@@ -521,6 +524,48 @@ extern void petscfortranprinttounit_(PetscInt *, const char *, PetscErrorCode *,
   #endif
 
   #define PETSCDEFAULTBUFFERSIZE 8 * 1024
+
+static PetscInt PETSC_VIEWER_ASCII_WORLD_fileunit = 0;
+
+// PetscClangLinter pragma disable: -fdoc-synopsis-macro-explicit-synopsis-valid-header
+/*MC
+  PetscViewerASCIIWORLDSetFileUnit - sets `PETSC_VIEWER_STDOUT_WORLD` to write to a Fortran IO unit
+
+  Synopsis:
+  #include <petscviewer.h>
+  void PetscViewerASCIIWORLDSetFileUnit(PetscInt unit, PetscErrorCode ierr)
+
+  Input Parameter:
+. unit - the unit number
+
+  Output Parameter:
+. ierr - the error code
+
+  Level: intermediate
+
+  Notes:
+  Must be called before `PetscInitialize()`
+
+  This may not work currently with some viewers that (improperly) use the `fd` directly instead of `PetscViewerASCIIPrintf()`
+
+  With this option, for example, `-log_options` results will be saved to the Fortran file
+
+  Any process may call this but only the unit passed on the first process is used
+
+  Fortran Note:
+  Only for Fortran
+
+  Developer Note:
+  `PetscViewerASCIIWORLDSetFilename()` could be added in the future
+
+.seealso: `PetscViewerASCIISetFILE()`, `PETSCVIEWERASCII`, `PetscViewerASCIIOpenWithFileUnit()`, `PetscViewerASCIIWORLDSetFileUnit()`
+M*/
+PETSC_EXTERN void petscviewerasciiworldsetfileunit_(PetscInt *unit, PetscErrorCode *ierr)
+{
+  PETSC_VIEWER_ASCII_WORLD_fileunit = *unit;
+}
+
+  #include <petsc/private/fortranimpl.h>
 
 // PetscClangLinter pragma disable: -fdoc-synopsis-macro-explicit-synopsis-valid-header
 /*MC
@@ -545,12 +590,15 @@ extern void petscfortranprinttounit_(PetscInt *, const char *, PetscErrorCode *,
   Fortran Notes:
   Only for Fortran, use  `PetscViewerASCIISetFILE()` for C
 
-.seealso: `PetscViewerASCIISetFILE()`, `PETSCVIEWERASCII`, `PetscViewerASCIIOpenWithFileUnit()`
+.seealso: `PetscViewerASCIISetFILE()`, `PETSCVIEWERASCII`, `PetscViewerASCIIOpenWithFileUnit()`, `PetscViewerASCIIWORLDSetFileUnit()`
 M*/
 PETSC_EXTERN void petscviewerasciisetfileunit_(PetscViewer *lab, PetscInt *unit, PetscErrorCode *ierr)
 {
-  PetscViewer_ASCII *vascii = (PetscViewer_ASCII *)(*lab)->data;
+  PetscViewer_ASCII *vascii;
+  PetscViewer        v;
 
+  PetscPatchDefaultViewers_Fortran(lab, v);
+  vascii = (PetscViewer_ASCII *)v->data;
   if (vascii->mode == FILE_MODE_READ) {
     *ierr = PETSC_ERR_ARG_WRONGSTATE;
     return;
@@ -635,6 +683,62 @@ static PetscErrorCode PetscFPrintfFortran(PetscInt unit, const char str[])
 }
 #endif
 
+/*@
+  PetscViewerASCIIGetStdout - Creates a `PETSCVIEWERASCII` `PetscViewer` shared by all processes
+  in a communicator. Error returning version of `PETSC_VIEWER_STDOUT_()`
+
+  Collective
+
+  Input Parameter:
+. comm - the MPI communicator to share the `PetscViewer`
+
+  Output Parameter:
+. viewer - the viewer
+
+  Level: beginner
+
+  Note:
+  This object is destroyed in `PetscFinalize()`, `PetscViewerDestroy()` should never be called on it
+
+  Developer Note:
+  This should be used in all PETSc source code instead of `PETSC_VIEWER_STDOUT_()` since it allows error checking
+
+.seealso: [](sec_viewers), `PETSC_VIEWER_DRAW_()`, `PetscViewerASCIIOpen()`, `PETSC_VIEWER_STDERR_`, `PETSC_VIEWER_STDOUT_WORLD`,
+          `PETSC_VIEWER_STDOUT_SELF`
+@*/
+PetscErrorCode PetscViewerASCIIGetStdout(MPI_Comm comm, PetscViewer *viewer)
+{
+  PetscBool flg;
+  MPI_Comm  ncomm;
+
+  PetscFunctionBegin;
+  PetscCall(PetscSpinlockLock(&PetscViewerASCIISpinLockStdout));
+  PetscCall(PetscCommDuplicate(comm, &ncomm, NULL));
+  if (Petsc_Viewer_Stdout_keyval == MPI_KEYVAL_INVALID) PetscCallMPI(MPI_Comm_create_keyval(MPI_COMM_NULL_COPY_FN, MPI_COMM_NULL_DELETE_FN, &Petsc_Viewer_Stdout_keyval, NULL));
+  PetscCallMPI(MPI_Comm_get_attr(ncomm, Petsc_Viewer_Stdout_keyval, (void **)viewer, (PetscMPIInt *)&flg));
+  if (!flg) { /* PetscViewer not yet created */
+#if defined(PETSC_USE_FORTRAN_BINDINGS)
+    PetscMPIInt size, gsize;
+
+    PetscCallMPI(MPI_Comm_size(comm, &size));
+    PetscCallMPI(MPI_Comm_size(PETSC_COMM_WORLD, &gsize));
+    if (size == gsize) { PetscCallMPI(MPI_Bcast(&PETSC_VIEWER_ASCII_WORLD_fileunit, 1, MPIU_INT, 0, comm)); }
+    if (PETSC_VIEWER_ASCII_WORLD_fileunit) {
+      PetscErrorCode ierr;
+
+      petscviewerasciiopenwithfileunit_(&ncomm, &PETSC_VIEWER_ASCII_WORLD_fileunit, viewer, &ierr);
+    } else
+#endif
+      PetscCall(PetscViewerASCIIOpen(ncomm, "stdout", viewer));
+    ((PetscObject)*viewer)->persistent = PETSC_TRUE;
+    PetscCall(PetscObjectRegisterDestroy((PetscObject)*viewer));
+    PetscCallMPI(MPI_Comm_set_attr(ncomm, Petsc_Viewer_Stdout_keyval, (void *)*viewer));
+  }
+  PetscCall(PetscCommDestroy(&ncomm));
+  PetscCall(PetscSpinlockUnlock(&PetscViewerASCIISpinLockStdout));
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
 /*@C
   PetscViewerASCIIPrintf - Prints to a file, only from the first
   processor in the `PetscViewer` of type `PETSCVIEWERASCII`
@@ -659,7 +763,7 @@ PetscErrorCode PetscViewerASCIIPrintf(PetscViewer viewer, const char format[], .
 {
   PetscViewer_ASCII *ascii = (PetscViewer_ASCII *)viewer->data;
   PetscMPIInt        rank;
-  PetscInt           tab, intab = ascii->tab;
+  PetscInt           tab = 0, intab = ascii->tab;
   FILE              *fd = ascii->fd;
   PetscBool          iascii;
 
@@ -678,27 +782,16 @@ PetscErrorCode PetscViewerASCIIPrintf(PetscViewer viewer, const char format[], .
     size_t  fullLength;
 
     PetscCall(PetscCalloc1(QUEUESTRINGSIZE, &string));
+    for (; tab < ascii->tab; tab++) { string[2 * tab] = string[2 * tab + 1] = ' '; }
     va_start(Argp, format);
-    PetscCall(PetscVSNPrintf(string, QUEUESTRINGSIZE, format, &fullLength, Argp));
+    PetscCall(PetscVSNPrintf(string + 2 * intab, QUEUESTRINGSIZE - 2 * intab, format, &fullLength, Argp));
     va_end(Argp);
-    PetscCall(PetscViewerASCIISynchronizedPrintf(viewer, "%s", string));
+    PetscCall(PetscViewerASCIISynchronizedPrintf(ascii->bviewer, "%s", string));
     PetscCall(PetscFree(string));
   } else { /* write directly to file */
     va_list Argp;
-    /* flush my own messages that I may have queued up */
-    PrintfQueue next = ascii->petsc_printfqueuebase, previous;
-    PetscInt    i;
-    for (i = 0; i < ascii->petsc_printfqueuelength; i++) {
-      if (!ascii->fileunit) PetscCall(PetscFPrintf(PETSC_COMM_SELF, fd, "%s", next->string));
-      else PetscCall(PetscFPrintfFortran(ascii->fileunit, next->string));
-      previous = next;
-      next     = next->next;
-      PetscCall(PetscFree(previous->string));
-      PetscCall(PetscFree(previous));
-    }
-    ascii->petsc_printfqueue       = NULL;
-    ascii->petsc_printfqueuelength = 0;
-    tab                            = intab;
+
+    tab = intab;
     while (tab--) {
       if (!ascii->fileunit) PetscCall(PetscFPrintf(PETSC_COMM_SELF, fd, "  "));
       else PetscCall(PetscFPrintfFortran(ascii->fileunit, "   "));
@@ -854,8 +947,8 @@ static PetscErrorCode PetscViewerGetSubViewer_ASCII(PetscViewer viewer, MPI_Comm
   PetscViewer_ASCII *vascii = (PetscViewer_ASCII *)viewer->data, *ovascii;
 
   PetscFunctionBegin;
-  PetscCall(PetscViewerASCIIPushSynchronized(viewer));
   PetscCheck(!vascii->sviewer, PETSC_COMM_SELF, PETSC_ERR_ORDER, "SubViewer already obtained from PetscViewer and not restored");
+  PetscCall(PetscViewerASCIIPushSynchronized(viewer));
   /*
      The following line is a bug; it does another PetscViewerASCIIPushSynchronized() on viewer, but if it is removed the code won't work
      because it relies on this behavior in other places. In particular this line causes the synchronized flush to occur when the viewer is destroyed
@@ -865,12 +958,12 @@ static PetscErrorCode PetscViewerGetSubViewer_ASCII(PetscViewer viewer, MPI_Comm
      PCView_GASM().
   */
   PetscCall(PetscViewerASCIIPushSynchronized(viewer));
+  PetscCall(PetscViewerFlush(viewer));
   PetscCall(PetscViewerCreate(subcomm, outviewer));
   PetscCall(PetscViewerSetType(*outviewer, PETSCVIEWERASCII));
   PetscCall(PetscViewerASCIIPushSynchronized(*outviewer));
   ovascii            = (PetscViewer_ASCII *)(*outviewer)->data;
   ovascii->fd        = vascii->fd;
-  ovascii->tab       = vascii->tab;
   ovascii->closefile = PETSC_FALSE;
 
   vascii->sviewer                                      = *outviewer;
@@ -892,6 +985,7 @@ static PetscErrorCode PetscViewerRestoreSubViewer_ASCII(PetscViewer viewer, MPI_
   ascii->sviewer             = NULL;
   (*outviewer)->ops->destroy = PetscViewerDestroy_ASCII;
   PetscCall(PetscViewerDestroy(outviewer));
+  PetscCall(PetscViewerFlush(viewer));
   PetscCall(PetscViewerASCIIPopSynchronized(viewer));
   PetscFunctionReturn(PETSC_SUCCESS);
 }
@@ -901,7 +995,8 @@ static PetscErrorCode PetscViewerView_ASCII(PetscViewer v, PetscViewer viewer)
   PetscViewer_ASCII *ascii = (PetscViewer_ASCII *)v->data;
 
   PetscFunctionBegin;
-  if (ascii->filename) PetscCall(PetscViewerASCIIPrintf(viewer, "Filename: %s\n", ascii->filename));
+  if (ascii->fileunit) PetscCall(PetscViewerASCIIPrintf(viewer, "Fortran FILE UNIT: %" PetscInt_FMT "\n", ascii->fileunit));
+  else if (ascii->filename) PetscCall(PetscViewerASCIIPrintf(viewer, "Filename: %s\n", ascii->filename));
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
@@ -979,7 +1074,7 @@ PETSC_EXTERN PetscErrorCode PetscViewerCreate_ASCII(PetscViewer viewer)
     PetscViewerASCIISynchronizedPrintf(viewer, ...);
     ...
     PetscViewerFlush(viewer);
-   PetscViewerASCIIPopSynchronized(viewer);
+    PetscViewerASCIIPopSynchronized(viewer);
 .ve
 
   Fortran Notes:
@@ -993,10 +1088,9 @@ PetscErrorCode PetscViewerASCIISynchronizedPrintf(PetscViewer viewer, const char
 {
   PetscViewer_ASCII *vascii = (PetscViewer_ASCII *)viewer->data;
   PetscMPIInt        rank;
-  PetscInt           tab = vascii->tab;
+  PetscInt           tab = 0;
   MPI_Comm           comm;
-  FILE              *fp;
-  PetscBool          iascii, hasbviewer = PETSC_FALSE;
+  PetscBool          iascii;
 
   PetscFunctionBegin;
   PetscValidHeaderSpecific(viewer, PETSC_VIEWER_CLASSID, 1);
@@ -1009,31 +1103,22 @@ PetscErrorCode PetscViewerASCIISynchronizedPrintf(PetscViewer viewer, const char
   PetscCallMPI(MPI_Comm_rank(comm, &rank));
 
   if (vascii->bviewer) {
-    hasbviewer = PETSC_TRUE;
-    if (rank == 0) {
-      vascii = (PetscViewer_ASCII *)vascii->bviewer->data;
-      PetscCall(PetscObjectGetComm((PetscObject)viewer, &comm));
-      PetscCallMPI(MPI_Comm_rank(comm, &rank));
-    }
-  }
-
-  fp = vascii->fd;
-
-  if (rank == 0 && !hasbviewer) { /* First processor prints immediately to fp */
+    char   *string;
     va_list Argp;
-    /* flush my own messages that I may have queued up */
-    PrintfQueue next = vascii->petsc_printfqueuebase, previous;
-    PetscInt    i;
-    for (i = 0; i < vascii->petsc_printfqueuelength; i++) {
-      PetscCall(PetscFPrintf(comm, fp, "%s", next->string));
-      previous = next;
-      next     = next->next;
-      PetscCall(PetscFree(previous->string));
-      PetscCall(PetscFree(previous));
-    }
-    vascii->petsc_printfqueue       = NULL;
-    vascii->petsc_printfqueuelength = 0;
+    size_t  fullLength;
 
+    PetscCall(PetscCalloc1(QUEUESTRINGSIZE, &string));
+    for (; tab < vascii->tab; tab++) { string[2 * tab] = string[2 * tab + 1] = ' '; }
+    va_start(Argp, format);
+    PetscCall(PetscVSNPrintf(string + 2 * tab, QUEUESTRINGSIZE - 2 * tab, format, &fullLength, Argp));
+    va_end(Argp);
+    PetscCall(PetscViewerASCIISynchronizedPrintf(vascii->bviewer, "%s", string));
+    PetscCall(PetscFree(string));
+  } else if (rank == 0) { /* First processor prints immediately to fp */
+    va_list Argp;
+    FILE   *fp = vascii->fd;
+
+    tab = vascii->tab;
     while (tab--) PetscCall(PetscFPrintf(PETSC_COMM_SELF, fp, "  "));
 
     va_start(Argp, format);
@@ -1064,6 +1149,8 @@ PetscErrorCode PetscViewerASCIISynchronizedPrintf(PetscViewer viewer, const char
     next->size = QUEUESTRINGSIZE;
     PetscCall(PetscCalloc1(next->size, &next->string));
     string = next->string;
+
+    tab = vascii->tab;
     tab *= 2;
     while (tab--) *string++ = ' ';
     va_start(Argp, format);

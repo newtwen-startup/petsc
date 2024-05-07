@@ -350,6 +350,7 @@ PetscErrorCode PetscDSSetFromOptions(PetscDS prob)
   }
   PetscCall(PetscOptionsBool("-petscds_jac_pre", "Discrete System", "PetscDSUseJacobianPreconditioner", prob->useJacPre, &prob->useJacPre, &flg));
   PetscCall(PetscOptionsBool("-petscds_force_quad", "Discrete System", "PetscDSSetForceQuad", prob->forceQuad, &prob->forceQuad, &flg));
+  PetscCall(PetscOptionsInt("-petscds_print_integrate", "Discrete System", "", prob->printIntegrate, &prob->printIntegrate, NULL));
   PetscTryTypeMethod(prob, setfromoptions);
   /* process any options handlers added with PetscObjectAddOptionsHandler() */
   PetscCall(PetscObjectProcessOptionsHandlers((PetscObject)prob, PetscOptionsObject));
@@ -374,7 +375,7 @@ PetscErrorCode PetscDSSetUp(PetscDS prob)
 {
   const PetscInt Nf          = prob->Nf;
   PetscBool      hasH        = PETSC_FALSE;
-  PetscInt       maxOrder[4] = {-1, -1, -1, -1};
+  PetscInt       maxOrder[4] = {-2, -2, -2, -2};
   PetscInt       dim, dimEmbed, NbMax = 0, NcMax = 0, NqMax = 0, NsMax = 1, f;
 
   PetscFunctionBegin;
@@ -549,15 +550,15 @@ static PetscErrorCode PetscDSDestroyStructs_Static(PetscDS prob)
 
 static PetscErrorCode PetscDSEnlarge_Static(PetscDS prob, PetscInt NfNew)
 {
-  PetscObject          *tmpd;
-  PetscBool            *tmpi;
-  PetscInt             *tmpk;
-  PetscBool            *tmpc;
-  PetscPointFunc       *tmpup;
-  PetscSimplePointFunc *tmpexactSol, *tmpexactSol_t;
-  void                **tmpexactCtx, **tmpexactCtx_t;
-  void                **tmpctx;
-  PetscInt              Nf = prob->Nf, f;
+  PetscObject         *tmpd;
+  PetscBool           *tmpi;
+  PetscInt            *tmpk;
+  PetscBool           *tmpc;
+  PetscPointFunc      *tmpup;
+  PetscSimplePointFn **tmpexactSol, **tmpexactSol_t;
+  void               **tmpexactCtx, **tmpexactCtx_t;
+  void               **tmpctx;
+  PetscInt             Nf = prob->Nf, f;
 
   PetscFunctionBegin;
   if (Nf >= NfNew) PetscFunctionReturn(PETSC_SUCCESS);
@@ -625,13 +626,13 @@ PetscErrorCode PetscDSDestroy(PetscDS *ds)
 
   PetscFunctionBegin;
   if (!*ds) PetscFunctionReturn(PETSC_SUCCESS);
-  PetscValidHeaderSpecific((*ds), PETSCDS_CLASSID, 1);
+  PetscValidHeaderSpecific(*ds, PETSCDS_CLASSID, 1);
 
-  if (--((PetscObject)(*ds))->refct > 0) {
+  if (--((PetscObject)*ds)->refct > 0) {
     *ds = NULL;
     PetscFunctionReturn(PETSC_SUCCESS);
   }
-  ((PetscObject)(*ds))->refct = 0;
+  ((PetscObject)*ds)->refct = 0;
   if ((*ds)->subprobs) {
     PetscInt dim, d;
 
@@ -645,11 +646,11 @@ PetscErrorCode PetscDSDestroy(PetscDS *ds)
   PetscCall(PetscWeakFormDestroy(&(*ds)->wf));
   PetscCall(PetscFree2((*ds)->update, (*ds)->ctx));
   PetscCall(PetscFree4((*ds)->exactSol, (*ds)->exactCtx, (*ds)->exactSol_t, (*ds)->exactCtx_t));
-  PetscTryTypeMethod((*ds), destroy);
+  PetscTryTypeMethod(*ds, destroy);
   PetscCall(PetscDSDestroyBoundary(*ds));
   PetscCall(PetscFree((*ds)->constants));
   for (PetscInt c = 0; c < DM_NUM_POLYTOPES; ++c) {
-    const PetscInt Na = DMPolytopeTypeGetNumArrangments((DMPolytopeType)c);
+    const PetscInt Na = DMPolytopeTypeGetNumArrangements((DMPolytopeType)c);
     if ((*ds)->quadPerm[c])
       for (PetscInt o = 0; o < Na; ++o) PetscCall(ISDestroy(&(*ds)->quadPerm[c][o]));
     PetscCall(PetscFree((*ds)->quadPerm[c]));
@@ -2845,7 +2846,7 @@ PetscErrorCode PetscDSGetConstants(PetscDS prob, PetscInt *numConstants, const P
   Input Parameters:
 + prob         - The `PetscDS` object
 . numConstants - The number of constants
-- constants    - The array of constants, NULL if there are none
+- constants    - The array of constants, `NULL` if there are none
 
   Level: intermediate
 
@@ -3751,6 +3752,32 @@ PetscErrorCode PetscDSGetBoundary(PetscDS ds, PetscInt bd, PetscWeakForm *wf, DM
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
+/*@
+  PetscDSUpdateBoundaryLabels - Update `DMLabel` in each boundary condition using the label name and the input `DM`
+
+  Not Collective
+
+  Input Parameters:
++ ds - The source `PetscDS` object
+- dm - The `DM` holding labels
+
+  Level: intermediate
+
+.seealso: `PetscDS`, `DMBoundary`, `DM`, `PetscDSCopyBoundary()`, `PetscDSCreate()`, `DMGetLabel()`
+@*/
+PetscErrorCode PetscDSUpdateBoundaryLabels(PetscDS ds, DM dm)
+{
+  DSBoundary b;
+
+  PetscFunctionBegin;
+  PetscValidHeaderSpecific(ds, PETSCDS_CLASSID, 1);
+  PetscValidHeaderSpecific(dm, DM_CLASSID, 2);
+  for (b = ds->boundary; b; b = b->next) {
+    if (b->lname) PetscCall(DMGetLabel(dm, b->lname, &b->label));
+  }
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
 static PetscErrorCode DSBoundaryDuplicate_Internal(DSBoundary b, DSBoundary *bNew)
 {
   PetscFunctionBegin;
@@ -3800,7 +3827,7 @@ PetscErrorCode PetscDSCopyBoundary(PetscDS ds, PetscInt numFields, const PetscIn
   PetscValidHeaderSpecific(newds, PETSCDS_CLASSID, 4);
   if (ds == newds) PetscFunctionReturn(PETSC_SUCCESS);
   PetscCall(PetscDSDestroyBoundary(newds));
-  lastnext = &(newds->boundary);
+  lastnext = &newds->boundary;
   for (b = ds->boundary; b; b = b->next) {
     DSBoundary bNew;
     PetscInt   fieldNew = -1;
@@ -3816,7 +3843,7 @@ PetscErrorCode PetscDSCopyBoundary(PetscDS ds, PetscInt numFields, const PetscIn
     PetscCall(DSBoundaryDuplicate_Internal(b, &bNew));
     bNew->field = fieldNew < 0 ? b->field : fieldNew;
     *lastnext   = bNew;
-    lastnext    = &(bNew->next);
+    lastnext    = &bNew->next;
   }
   PetscFunctionReturn(PETSC_SUCCESS);
 }
@@ -4030,9 +4057,9 @@ PetscErrorCode PetscDSCopyConstants(PetscDS prob, PetscDS newprob)
 @*/
 PetscErrorCode PetscDSCopyExactSolutions(PetscDS ds, PetscDS newds)
 {
-  PetscSimplePointFunc sol;
-  void                *ctx;
-  PetscInt             Nf, f;
+  PetscSimplePointFn *sol;
+  void               *ctx;
+  PetscInt            Nf, f;
 
   PetscFunctionBegin;
   PetscValidHeaderSpecific(ds, PETSCDS_CLASSID, 1);
@@ -4131,7 +4158,7 @@ PetscErrorCode PetscDSPermuteQuadPoint(PetscDS ds, PetscInt ornt, PetscInt field
   PetscCall(PetscQuadratureGetData(quad, NULL, NULL, &Nq, NULL, NULL));
   PetscCall(PetscQuadratureGetCellType(quad, &ct));
   PetscCheck(q >= 0 && q < Nq, PETSC_COMM_SELF, PETSC_ERR_ARG_OUTOFRANGE, "Quadrature point %" PetscInt_FMT " is not in [0, %" PetscInt_FMT ")", q, Nq);
-  Na = DMPolytopeTypeGetNumArrangments(ct) / 2;
+  Na = DMPolytopeTypeGetNumArrangements(ct) / 2;
   PetscCheck(ornt >= -Na && ornt < Na, PETSC_COMM_SELF, PETSC_ERR_ARG_OUTOFRANGE, "Orientation %" PetscInt_FMT " of %s is not in [%" PetscInt_FMT ", %" PetscInt_FMT ")", ornt, DMPolytopeTypes[ct], -Na, Na);
   if (!ds->quadPerm[(PetscInt)ct]) PetscCall(PetscQuadratureComputePermutations(quad, NULL, &ds->quadPerm[(PetscInt)ct]));
   permIS = ds->quadPerm[(PetscInt)ct][ornt + Na];

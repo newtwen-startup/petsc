@@ -148,6 +148,14 @@ PetscErrorCode MatSetType(Mat mat, MatType matype)
     PetscCall(MatConvert(mat, matype, MAT_INPLACE_MATRIX, &mat));
     PetscFunctionReturn(PETSC_SUCCESS);
   }
+  if (names && mat->assembled) {
+    PetscCall(PetscStrbeginswith(names->rname, "sell", &sametype));
+    if (sametype) {                                                  /* mattype is MATSELL or its subclass */
+      PetscCall(MatConvert(mat, MATSELL, MAT_INPLACE_MATRIX, &mat)); /* convert to matsell first */
+      PetscCall(MatConvert(mat, matype, MAT_INPLACE_MATRIX, &mat));
+      PetscFunctionReturn(PETSC_SUCCESS);
+    }
+  }
   PetscTryTypeMethod(mat, destroy);
   mat->ops->destroy = NULL;
 
@@ -265,10 +273,8 @@ PetscErrorCode MatSetVecType(Mat mat, VecType vtype)
    MatRegister("my_mat", MyMatCreate);
 .ve
 
-  Then, your solver can be chosen with the procedural interface via
-$     MatSetType(Mat, "my_mat")
-  or at runtime via the option
-$     -mat_type my_mat
+  Then, your solver can be chosen with the procedural interface via `MatSetType(Mat, "my_mat")` or at runtime via the option
+  `-mat_type my_mat`
 
 .seealso: [](ch_matrices), `Mat`, `MatType`, `MatSetType()`, `MatRegisterAll()`
 @*/

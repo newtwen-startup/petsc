@@ -17,13 +17,12 @@
 #
 # This makefile does not require GNUmake
 ALL: all
-DIRS = src include interfaces share/petsc/matlab
 
 # next line defines PETSC_DIR and PETSC_ARCH if they are not set
 include ././${PETSC_ARCH}/lib/petsc/conf/petscvariables
 include ${PETSC_DIR}/${PETSC_ARCH}/lib/petsc/conf/petscrules
-include ${PETSC_DIR}/lib/petsc/conf/rules.doc
-include ${PETSC_DIR}/lib/petsc/conf/rules.utils
+include ${PETSC_DIR}/lib/petsc/conf/rules_doc.mk
+include ${PETSC_DIR}/lib/petsc/conf/rules_util.mk
 
 # This makefile contains a lot of PHONY targets with improperly specified prerequisites
 # where correct execution instead depends on the targets being processed in the correct
@@ -148,35 +147,35 @@ check_build:
 	+@cd src/snes/tutorials >/dev/null; ${RUN_TEST} clean-legacy
 	+@cd src/snes/tutorials >/dev/null; ${RUN_TEST} testex19
 	+@if [ ! "${MPI_IS_MPIUNI}" ]; then cd src/snes/tutorials >/dev/null; ${RUN_TEST} testex19_mpi; fi
-	+@if [ "${HYPRE_LIB}" != "" ] && [ "${PETSC_SCALAR}" = "real" ]; then \
-          if [ "${CUDA_LIB}" != "" ]; then HYPRE_TEST=runex19_hypre_cuda; \
-          elif [ "${HIP_LIB}" != "" ]; then HYPRE_TEST=runex19_hypre_hip; \
+	+@if [ "`grep -E '^#define PETSC_HAVE_HYPRE 1' ${PETSCCONF_H}`" = "#define PETSC_HAVE_HYPRE 1" ] && [ "${PETSC_SCALAR}" = "real" ]; then \
+          if [ "`grep -E '^#define PETSC_HAVE_CUDA 1' ${PETSCCONF_H}`" = "#define PETSC_HAVE_CUDA 1" ]; then HYPRE_TEST=runex19_hypre_cuda; \
+          elif [ "`grep -E '^#define PETSC_HAVE_HIP 1' ${PETSCCONF_H}`" = "#define PETSC_HAVE_HIP 1" ]; then HYPRE_TEST=runex19_hypre_hip; \
           else HYPRE_TEST=runex19_hypre; fi; \
           cd src/snes/tutorials >/dev/null; ${RUN_TEST} $${HYPRE_TEST}; \
         fi;
-	+@if [ "${CUDA_LIB}" != "" ]; then \
+	+@if [ "`grep -E '^#define PETSC_HAVE_CUDA 1' ${PETSCCONF_H}`" = "#define PETSC_HAVE_CUDA 1" ]; then \
           cd src/snes/tutorials >/dev/null; ${RUN_TEST} runex19_cuda; \
         fi;
 	+@if [ "${MPI_IS_MPIUNI}" = "" ]; then \
           cd src/snes/tutorials >/dev/null; \
-          if [ "${KOKKOS_KERNELS_LIB}" != "" ]  &&  [ "${PETSC_SCALAR}" = "real" ] && [ "${PETSC_PRECISION}" = "double" ]; then \
+          if [ "`grep -E '^#define PETSC_HAVE_KOKKOS_KERNELS 1' ${PETSCCONF_H}`" = "#define PETSC_HAVE_KOKKOS_KERNELS 1" ] && [ "${PETSC_SCALAR}" = "real" ] && [ "${PETSC_PRECISION}" = "double" ]; then \
             ${RUN_TEST} runex3k_kokkos; \
           fi;\
-          if [ "${MUMPS_LIB}" != "" ]; then \
+          if [ "`grep -E '^#define PETSC_HAVE_MUMPS 1' ${PETSCCONF_H}`" = "#define PETSC_HAVE_MUMPS 1" ]; then \
              ${RUN_TEST} runex19_fieldsplit_mumps; \
           fi;\
-          if [ "${SUITESPARSE_LIB}" != "" ]; then \
+          if [ "`grep -E '^#define PETSC_HAVE_SUITESPARSE 1' ${PETSCCONF_H}`" = "#define PETSC_HAVE_SUITESPARSE 1" ]; then \
              ${RUN_TEST} runex19_suitesparse; \
           fi;\
-          if [ "${SUPERLU_DIST_LIB}" != "" ]; then \
+          if [ "`grep -E '^#define PETSC_HAVE_SUPERLU_DIST 1' ${PETSCCONF_H}`" = "#define PETSC_HAVE_SUPERLU_DIST 1" ]; then \
             ${RUN_TEST} runex19_superlu_dist; \
           fi;\
-          if ( [ "${ML_LIB}" != "" ] ||  [ "${TRILINOS_LIB}" != "" ] ); then \
+          if [ "`grep -E '^#define PETSC_HAVE_ML 1' ${PETSCCONF_H}`" = "#define PETSC_HAVE_ML 1" ] || [ "`grep -E '^#define PETSC_HAVE_TRILINOS 1' ${PETSCCONF_H}`" = "#define PETSC_HAVE_TRILINOS 1" ]; then \
             ${RUN_TEST} runex19_ml; \
           fi; \
 	  ${RUN_TEST} clean-legacy; \
           cd - > /dev/null; \
-          if ( [ "${AMREX_LIB}" != "" ] && [ "${CUDA_LIB}" = "" ] ); then \
+          if [ "`grep -E '^#define PETSC_HAVE_AMREX 1' ${PETSCCONF_H}`" = "#define PETSC_HAVE_AMREX 1" ] && [ "`grep -E '^#define PETSC_HAVE_CUDA 1' ${PETSCCONF_H}`" != "#define PETSC_HAVE_CUDA 1" ]; then \
             echo "Running amrex test example to verify correct installation";\
             echo "Using PETSC_DIR=${PETSC_DIR} and PETSC_ARCH=${PETSC_ARCH}";\
             cd src/ksp/ksp/tutorials/amrex >/dev/null;\
@@ -186,7 +185,7 @@ check_build:
             cd - > /dev/null; \
           fi;\
         fi;
-	+@if [ "${HDF5_LIB}" != "" ]; then \
+	+@if [ "`grep -E '^#define PETSC_HAVE_HDF5 1' ${PETSCCONF_H}`" = "#define PETSC_HAVE_HDF5 1" ]; then \
           cd src/vec/vec/tests >/dev/null;\
           ${RUN_TEST} clean-legacy; \
           ${RUN_TEST} runex47; \
@@ -204,22 +203,22 @@ check_build:
            ${RUN_TEST} testex100; \
            ${RUN_TEST} clean-legacy; \
          fi;
-	+@grep -E "^#define PETSC_USE_FORTRAN_BINDINGS 1" ${PETSCCONF_H} | tee .ftn.log > /dev/null; \
-         if test -s .ftn.log; then \
+	+@if [ "`grep -E '^#define PETSC_USE_FORTRAN_BINDINGS 1' ${PETSCCONF_H}`" = "#define PETSC_USE_FORTRAN_BINDINGS 1" ]; then \
            cd src/snes/tutorials >/dev/null; \
            ${RUN_TEST} clean-legacy; \
            ${RUN_TEST} testex5f; \
            ${RUN_TEST} clean-legacy; \
-         fi; ${RM} .ftn.log;
-	+@grep -E "^#define PETSC_HAVE_MATLAB 1" ${PETSCCONF_H} | tee .ftn.log > /dev/null; \
-         if test -s .ftn.log; then \
-           cd src/vec/vec/tutorials >/dev/null; \
+         fi;
+	+@if [ "`grep -E '^#define PETSC_HAVE_MATLAB 1' ${PETSCCONF_H}`" = "#define PETSC_HAVE_MATLAB 1" ]; then \
            ${RUN_TEST} clean-legacy; \
            ${RUN_TEST} testex31; \
            ${RUN_TEST} clean-legacy; \
-          fi; ${RM} .ftn.log;
+          fi;
 	+@if [ "${SLEPC}" = "yes" ]; then \
            ${OMAKE_SELF} PETSC_ARCH=${PETSC_ARCH} PETSC_DIR=${PETSC_DIR} slepc-check; \
+         fi;
+	+@if [ "${MFEM}" = "yes" ]; then \
+           ${OMAKE_SELF} PETSC_ARCH=${PETSC_ARCH} PETSC_DIR=${PETSC_DIR} mfem-check; \
          fi;
 	-@echo "Completed PETSc check examples"
 
@@ -413,7 +412,7 @@ alletags:
 allgtags:
 	-@find ${PETSC_DIR}/include ${PETSC_DIR}/src -regex '\(.*makefile\|.*\.\(cc\|hh\|cpp\|cxx\|C\|hpp\|c\|h\|cu\|m\)$$\)' | grep -v ftn-auto  | gtags -f -
 
-# ********* Rules for building "classic" documentation; uses rules also in lib/petsc/conf/rules.doc **************************************************
+# ********* Rules for building "classic" documentation; uses rules also in lib/petsc/conf/rules_doc.mk **************************************************
 
 docs:
 	cd doc; time ${OMAKE_SELF} sphinxhtml
@@ -430,41 +429,6 @@ chk_loc:
 	  echo " Please specify LOC variable for eg: make allmanpages LOC=/sandbox/petsc "; \
 	  printf "****************************************************************************"${PETSC_TEXT_NORMAL}"\n" ;  false; fi
 	@${MKDIR} ${LOC}/manualpages
-
-chk_c2html:
-	@if [ ${C2HTML}foo = foo ] ; then \
-          printf ${PETSC_TEXT_HILIGHT}"*********************** ERROR ************************\n" ; \
-          echo "Require c2html for html docs. Please reconfigure with --download-c2html=1"; \
-          printf "******************************************************"${PETSC_TEXT_NORMAL}"\n" ;false; fi
-
-
-# the ACTION=manualpages cannot run in parallel because they all write to the same manualpages.cit file
-hloc=include/petsc/private
-allmanpages: chk_loc deletemanualpages
-	-@echo " /* SUBMANSEC = PetscH */ " > ${hloc}/generated_khash.h
-	-@sed -e 's?<T>?I?g' -e 's?<t>?i?g' -e 's?<KeyType>?PetscInt?g' ${hloc}/hashset.txt >> ${hloc}/generated_khash.h
-	-@sed -e 's?<T>?IJ?g' -e 's?<t>?ij?g' -e 's?<KeyType>?struct {PetscInt i, j;}?g' ${hloc}/hashset.txt >> ${hloc}/generated_khash.h
-	-@sed -e 's?<T>?I?g' -e 's?<t>?i?g' -e 's?<KeyType>?PetscInt?g'  -e 's?<ValType>?PetscInt?g' ${hloc}/hashmap.txt >> ${hloc}/generated_khash.h
-	-@sed -e 's?<T>?IJ?g' -e 's?<t>?ij?g' -e 's?<KeyType>?struct {PetscInt i, j;}?g' -e 's?<ValType>?PetscInt?g' ${hloc}/hashmap.txt >> ${hloc}/generated_khash.h
-	-@sed -e 's?<T>?IJ?g' -e 's?<t>?ij?g' -e 's?<KeyType>?struct {PetscInt i, j;}?g' -e 's?<ValType>?PetscScalar?g' ${hloc}/hashmap.txt >> ${hloc}/generated_khash.h
-	-@sed -e 's?<T>?IV?g' -e 's?<t>?iv?g' -e 's?<KeyType>?PetscInt?g'  -e 's?<ValType>?PetscScalar?g' ${hloc}/hashmap.txt >> ${hloc}/generated_khash.h
-	-@sed -e 's?<T>?Obj?g' -e 's?<t>?obj?g' -e 's?<KeyType>?PetscInt64?g'  -e 's?<ValType>?PetscObject?g' ${hloc}/hashmap.txt >> ${hloc}/generated_khash.h
-	-@${RM} ${PETSC_DIR}/${PETSC_ARCH}/manualpages.err
-	-${OMAKE_SELF} ACTION=manualpages tree_src LOC=${LOC}
-	-@sed -e s%man+../%man+manualpages/% ${LOC}/manualpages/manualpages.cit > ${LOC}/manualpages/htmlmap
-	-@cat ${PETSC_DIR}/doc/classic/mpi.www.index >> ${LOC}/manualpages/htmlmap
-	@cat ${PETSC_DIR}/${PETSC_ARCH}/manualpages.err
-	@a=`cat ${PETSC_DIR}/${PETSC_ARCH}/manualpages.err | wc -l`; test ! $$a -gt 0
-
-#
-#  This code needs to be rewritten in Python to reduce by a factor of 100 the time it takes to run
-#
-c2html: chk_loc  chk_c2html
-	-@if command -v parallel &> /dev/null; then \
-           ls include/makefile src/*/makefile | xargs dirname | parallel -j ${MAKE_TEST_NP} --load ${MAKE_LOAD} 'cd {}; ${OMAKE_SELF} HTMLMAP=${HTMLMAP} LOC=${LOC} PETSC_DIR=${PETSC_DIR} ACTION=html tree' ; \
-         else \
-           ${OMAKE_SELF} HTMLMAP=${HTMLMAP} LOC=${LOC} PETSC_DIR=${PETSC_DIR} ACTION=html tree; \
-        fi
 
 alldocclean: deletemanualpages allcleanhtml
 

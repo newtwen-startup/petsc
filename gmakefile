@@ -148,7 +148,7 @@ define ARCHIVE_RECIPE_DEFAULT
 endef
 
 %.$(AR_LIB_SUFFIX) : $$(obj) | $$(@D)/.DIR
-	$(if $(findstring win_lib,$(AR)),$(ARCHIVE_RECIPE_WIN32FE_LIB),$(if $(findstring yes,$(AR_ARGFILE)),$(if $(GMAKE4),$(ARCHIVE_RECIPE_ARGFILE),$(ARCHIVE_RECIPE_DEFAULT)),$(ARCHIVE_RECIPE_DEFAULT)))
+	$(if $(findstring win32fe_lib,$(AR)),$(ARCHIVE_RECIPE_WIN32FE_LIB),$(if $(findstring yes,$(AR_ARGFILE)),$(if $(GMAKE4),$(ARCHIVE_RECIPE_ARGFILE),$(ARCHIVE_RECIPE_DEFAULT)),$(ARCHIVE_RECIPE_DEFAULT)))
 
 # with-single-library=0
 libpkg = $(foreach pkg, $1, $(LIBDIR)/libpetsc$(pkg).$(SL_LINKER_SUFFIX))
@@ -296,7 +296,7 @@ gmakeinfo:
 	-@echo "-----------------------------------------"
 	-@echo "Using configure Options: ${CONFIGURE_OPTIONS}"
 	-@echo "Using configuration flags:"
-	-@grep "\#define " ${PETSCCONF_H} | tail -n +2
+	-@grep "#define " ${PETSCCONF_H} | tail -n +2
 	-@echo "-----------------------------------------"
 	-@echo "Using C compile: ${PETSC_CCOMPILE_SINGLE}"
 	-@if [  "${MPICC_SHOW}" != "" ]; then \

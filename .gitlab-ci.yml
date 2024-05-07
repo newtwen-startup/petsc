@@ -153,8 +153,18 @@ c99-mlib-static-py:
 clang-uni:
   extends: .stage-1
   variables:
-    CONFIG_OPTS: --with-cc=clang --with-cxx=clang++ --with-mpi=0
+    CONFIG_OPTS: --with-cc=clang --with-cxx=clang++ --with-mpi=0 --with-strict-petscerrorcode
     TEST_SEARCH: snes_tutorials-ex48%
+
+gcc-lto:
+  extends: .stage-1
+  variables:
+    CONFIG_OPTS: CFLAGS= CXXFLAGS= FFLAGS=
+    MAKE_CFLAGS: -Werror -flto=4 -Werror=odr -Werror=lto-type-mismatch
+    MAKE_CXXFLAGS: -Werror -flto=4 -Werror=odr -Werror=lto-type-mismatch
+    MAKE_FFLAGS: -Werror -flto=4 -Werror=odr -Werror=lto-type-mismatch
+    TEST_SEARCH: snes_tutorials-ex19% snes_tutorials-ex5f%
+    LOAD_MODULES: gcc/12.1.0 mpich/4.1-gcc-12.1.0
 
 petsc4py-install:
   extends: .stage-2
@@ -204,10 +214,17 @@ petsc4py-pip:
   script:
     - python3 -m venv pip-builds
     - source pip-builds/bin/activate
-    - python3 -m pip install --upgrade pip==23.0.1
-    - python3 -m pip install .
-    - python3 -m pip install src/binding/petsc4py
-    - python3 -m petsc4py
+    - python -m pip install --upgrade pip
+    - unset PETSC_DIR PETSC_ARCH
+    - export PIP_WHEEL_DIR="${PWD}/wheelhouse"
+    - export PIP_FIND_LINKS="${PIP_WHEEL_DIR}"
+    - mkdir -p "${PIP_WHEEL_DIR}"
+    - python -m pip wheel .
+    - python -m pip wheel src/binding/petsc4py
+    - python -m pip install --pre --no-index --no-cache-dir petsc4py
+    - python -m pip list
+    - python -m petsc --prefix
+    - python -m petsc4py
 
 checksource:
   extends: .test-basic
@@ -218,11 +235,12 @@ checksource:
     - python3 ./configure --with-mpi=0 --with-fc=0 --with-cxx=0 --with-x=0 --with-bison=0 --with-cmake=0 --with-pthread=0 --with-regex=0
     - vermin --version
     - make vermin
-    - PATH=/nfs/gce/projects/petsc/soft/clang+llvm-16.0.0-x86_64-linux-gnu-ubuntu-18.04/bin:$PATH make checkclangformat SHELL=bash
+    - PATH=/nfs/gce/projects/petsc/soft/u22.04/spack-2024-03-06/opt/spack/linux-ubuntu22.04-x86_64/gcc-11.4.0/llvm-18.1.0-7hsf4hzma6aebqsd4ifb5brchcooktkp/bin:$PATH make checkclangformat SHELL=bash
     - make checkbadSource SHELL=bash
     - make checkbadFileChange SHELL=bash
     - make -f gmakefile check_output SHELL=bash
     - make check_petsc4py_rst
+    - make -C src/binding/petsc4py lint
   artifacts:
     name: "$CI_JOB_NAME"
     when: always
@@ -288,10 +306,11 @@ pause-for-approval:
     - cat ./config/examples/${TEST_ARCH}.py
     - ./config/examples/${TEST_ARCH}.py || if [ -f naglicenseproblem ]; then exit 126; else exit 1; fi
     - make CFLAGS="${MAKE_CFLAGS}" CXXFLAGS="${MAKE_CXXFLAGS}" FFLAGS="${MAKE_FFLAGS}" CUDAFLAGS="${MAKE_CUDAFLAGS}" || if [ -f naglicenseproblem ]; then exit 126; else exit 1; fi
+    - export ASAN_OPTIONS="log_path=stdout:detect_leaks=false" UBSAN_OPTIONS="suppressions=${PWD}/share/petsc/suppressions/ubsan" # only needed for -fsanitize=undefined (but harmless otherwise)
     - make CFLAGS="${MAKE_CFLAGS}" CXXFLAGS="${MAKE_CXXFLAGS}" FFLAGS="${MAKE_FFLAGS}" CUDAFLAGS="${MAKE_CUDAFLAGS}" check || if [ -f naglicenseproblem ]; then exit 126; else exit 1; fi
     - make updatedatafiles
     - if [ -z ${DISABLE_PETSC4PY_TESTS+x} ]; then if [ -z ${ENABLE_PETSC4PY_LDPRELOAD+x} ]; then echo "NOT using LD_PRELOAD"; make petsc4pytest; else echo "using LD_PRELOAD"; LD_PRELOAD=${PWD}/${TEST_ARCH}/lib/libpetsc.so make petsc4pytest; fi; fi
-    - if [ -z ${DISABLE_TESTS+x} ]; then make cleantest && make CFLAGS="${MAKE_CFLAGS}" CXXFLAGS="${MAKE_CXXFLAGS}" FFLAGS="${MAKE_FFLAGS}" CUDAFLAGS="${MAKE_CUDAFLAGS}" allgtests-tap TIMEOUT=${TIMEOUT}  ${TEST_OPTS} || if [ -f naglicenseproblem ]; then exit 126; else exit 1; fi; fi
+    - if [ -z ${DISABLE_TESTS+x} ]; then make cleantest && make CFLAGS="${MAKE_CFLAGS}" CXXFLAGS="${MAKE_CXXFLAGS}" FFLAGS="${MAKE_FFLAGS}" CUDAFLAGS="${MAKE_CUDAFLAGS}" allgtests-tap TIMEOUT=${TIMEOUT} ${TEST_OPTS} || if [ -f naglicenseproblem ]; then exit 126; else exit 1; fi; fi
     - if [ "${RUN_GCOV}" == 1 ]; then make gcov PETSC_GCOV_OPTIONS="${RUN_GCOV_OPTIONS}"; fi
   artifacts:
     reports:
@@ -625,7 +644,7 @@ linux-clang-cuda:
     - cuda-stage3
   variables:
     TEST_ARCH: arch-ci-linux-clang-cuda
-    TEST_OPTS: -j 1  queryval='cuda*,snes*' query='requires%OR%name'
+    TEST_OPTS: -j 1 queryval='cuda*,snes*' query='requires%OR%name'
     MODULEPATH: /nfs/gce/projects/petsc/soft/u22.04/spack-2023-02-02/share/spack/modules/linux-ubuntu22.04-ivybridge
     LOAD_MODULES: llvm-15.0.7-gcc-11.3.0-pjldtxf cuda-11.5.2-gcc-11.3.0-jkoottx gcc-11.3.0-gcc-11.3.0-pgrvke5
     MAKE_CUDAFLAGS: -Wno-pass-failed -Werror
@@ -832,7 +851,7 @@ check-each-commit:
   tags:
     - gce-u22-stage2
   script:
-    - export PATH=/nfs/gce/projects/petsc/soft/clang+llvm-16.0.0-x86_64-linux-gnu-ubuntu-18.04/bin:$PATH
+    - export PATH=/nfs/gce/projects/petsc/soft/u22.04/spack-2024-03-06/opt/spack/linux-ubuntu22.04-x86_64/gcc-11.4.0/llvm-18.1.0-7hsf4hzma6aebqsd4ifb5brchcooktkp/bin:$PATH
     - lib/petsc/bin/maint/check-each-commit.sh
   except:
     variables:
@@ -882,6 +901,17 @@ linux-intel:
   variables:
     TEST_ARCH: arch-ci-linux-intel
     LOAD_MODULES: intel-oneapi-compilers/2023.0.0 intel-oneapi-mkl/2022.0.2
+
+linux-clang-ubsan:
+  extends:
+    - .stage-2
+    - .linux_test
+    - .coverage-disable
+  tags:
+    - gce-u22-stage2
+  variables:
+    TEST_ARCH: arch-ci-linux-clang-ubsan
+    LOAD_MODULES: llvm/17.0.4
 
 linux-opt-arm:
   extends:
@@ -1169,7 +1199,7 @@ analyze-pipeline:
   tags:
     - linux-docs
   before_script:
-    - git fetch --unshallow --no-tags origin +release:remotes/origin/release +main:remotes/origin/main
+    - git fetch --unshallow --tags origin +release:remotes/origin/release +main:remotes/origin/main
     - module --trace load python-3.11.2-gcc-9.4.0-6p2ktlj
     - printf "PATH:$PATH\n"
     - printf "PYTHONPATH:$PYTHONPATH\n"
@@ -1177,7 +1207,7 @@ analyze-pipeline:
       python3 -m venv $VENV &&
       . $VENV/bin/activate &&
       cd doc &&
-      python3 -m pip install -r requirements.txt
+      python -m pip install -r requirements.txt
 
 #
 # Build documentation and make available for review using GitLab pages
@@ -1206,14 +1236,14 @@ docs-review:
 #
 # Deploy documentation using GitLab pages
 #
-pages:  # this job name has special meaning to GitLab
+pages: # this job name has special meaning to GitLab
   extends: .docs
   interruptible: true
   script:
     - mkdir -p ../public/ && cp public/* ../public/
     - (git checkout origin/main && pip install -r requirements.txt && make website-deploy SPHINXOPTS="-j 1" BUILDDIR="../public/main" && make latexpdf && mkdir -p ../public/main/manual && cp _build/latex/manual.pdf ../public/main/manual/) || (printf "Sphinx build failed (warnings count as errors)\n" && false)
-    - git clean -fdxq && rm -rf images ../arch-classic-docs
-    - (git checkout origin/release && pip install -r requirements.txt && make website-deploy SPHINXOPTS="-j 1"  BUILDDIR="../public/release" && make latexpdf && mkdir -p ../public/release/manual && cp _build/latex/manual.pdf ../public/release/manual/) || (printf "Sphinx build failed (warnings count as errors)\n" && false)
+    - cd .. && git clean -fdxq -e public -e venv-petsc-docs && cd doc && rm -rf images
+    - (git checkout origin/release && pip install -r requirements.txt && make website-deploy SPHINXOPTS="-j 1" BUILDDIR="../public/release" && make latexpdf && mkdir -p ../public/release/manual && cp _build/latex/manual.pdf ../public/release/manual/) || (printf "Sphinx build failed (warnings count as errors)\n" && false)
     - rm -rf ../public/*/.doctrees
   only:
     variables:
@@ -1225,7 +1255,7 @@ pages:  # this job name has special meaning to GitLab
 
 #
 #
-# The following tests are experimental; more tests by users at other sites may be added below this.  Experimental test
+# The following tests are experimental; more tests by users at other sites may be added below this. Experimental test
 # that fail produce a warning, but do not block execution of a pipeline.
 #
 

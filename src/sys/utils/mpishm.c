@@ -15,7 +15,7 @@ struct _n_PetscShmComm {
    Note: this is declared extern "C" because it is passed to MPI_Comm_create_keyval()
 
 */
-PETSC_EXTERN PetscMPIInt MPIAPI Petsc_ShmComm_Attr_Delete_Fn(MPI_Comm comm, PetscMPIInt keyval, void *val, void *extra_state)
+PETSC_EXTERN PetscMPIInt MPIAPI Petsc_ShmComm_Attr_DeleteFn(MPI_Comm comm, PetscMPIInt keyval, void *val, void *extra_state)
 {
   PetscShmComm p = (PetscShmComm)val;
 
@@ -40,6 +40,7 @@ static MPI_Comm       shmcomm_dupped_comms[MAX_SHMCOMM_DUPPED_COMMS];
 static PetscErrorCode PetscShmCommDestroyDuppedComms(void)
 {
   PetscInt i;
+
   PetscFunctionBegin;
   for (i = 0; i < num_dupped_comms; i++) PetscCall(PetscCommDestroy(&shmcomm_dupped_comms[i]));
   num_dupped_comms = 0; /* reset so that PETSc can be reinitialized */
@@ -53,7 +54,7 @@ static PetscErrorCode PetscShmCommDestroyDuppedComms(void)
   Collective.
 
   Input Parameter:
-. globcomm - `MPI_Comm`, which can be a user MPI_Comm or a PETSc inner MPI_Comm
+. globcomm - `MPI_Comm`, which can be a user `MPI_Comm` or a PETSc inner `MPI_Comm`
 
   Output Parameter:
 . pshmcomm - the PETSc shared memory communicator object
@@ -61,7 +62,7 @@ static PetscErrorCode PetscShmCommDestroyDuppedComms(void)
   Level: developer
 
   Note:
-  When used with MPICH, MPICH must be configured with --download-mpich-device=ch3:nemesis
+  When used with MPICH, MPICH must be configured with `--download-mpich-device=ch3:nemesis`
 
 .seealso: `PetscShmCommGlobalToLocal()`, `PetscShmCommLocalToGlobal()`, `PetscShmCommGetMpiShmComm()`
 @*/
@@ -512,7 +513,7 @@ PetscErrorCode PetscOmpCtrlDestroy(PetscOmpCtrl *pctrl)
 -   is_omp_master    - true if the calling process is an OMP master rank.
 
     Note:
-    Any output parameter can be NULL. The parameter is just ignored.
+    Any output parameter can be `NULL`. The parameter is just ignored.
 
     Level: developer
 

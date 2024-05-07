@@ -158,7 +158,7 @@ int main(int argc, char **argv)
      Create time integration context
      - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
   PetscCall(DMSetApplicationContext(da, &user));
-  PetscCall(DMDATSSetIFunctionLocal(da, INSERT_VALUES, (DMDATSIFunctionLocal)FormIFunctionLocal, &user));
+  PetscCall(DMDATSSetIFunctionLocal(da, INSERT_VALUES, (DMDATSIFunctionLocalFn *)FormIFunctionLocal, &user));
   PetscCall(TSSetMaxSteps(ts, 10000));
   PetscCall(TSSetMaxTime(ts, 1e12));
   PetscCall(TSSetExactFinalTime(ts, TS_EXACTFINALTIME_STEPOVER));
@@ -403,7 +403,7 @@ PetscErrorCode FormIFunctionLocal(DMDALocalInfo *info, PetscReal ptime, Field **
     test:
       suffix: 3
       nsize: 4
-      args: -da_refine 2 -lidvelocity 100 -grashof 1e3 -ts_max_steps 10 -ts_rtol 1e-3 -ts_atol 1e-3 -pc_type none -ts_type beuler -ts_monitor -snes_monitor_short -snes_type aspin -da_overlap 4
+      args: -da_refine 2 -lidvelocity 100 -grashof 1e3 -ts_max_steps 10 -ts_rtol 1e-3 -ts_atol 1e-3 -pc_type none -ts_type beuler -ts_monitor -snes_monitor_short -snes_type aspin -da_overlap 4 -npc_sub_ksp_type preonly -npc_sub_pc_type lu
       requires: !complex !single
 
     test:

@@ -307,7 +307,7 @@ PetscErrorCode MatFDColoringApply_AIJ(Mat J, MatFDColoring coloring, Vec x1, voi
           PetscScalar *tmp = Jentry2[nz].valaddr;
           *tmp             = dy[row] * dx;
 #else
-          *(Jentry2[nz].valaddr) = dy[row] * dx;
+          *Jentry2[nz].valaddr = dy[row] * dx;
 #endif
           nz++;
         }
@@ -318,7 +318,7 @@ PetscErrorCode MatFDColoringApply_AIJ(Mat J, MatFDColoring coloring, Vec x1, voi
           PetscScalar *tmp = Jentry[nz].valaddr;
           *tmp             = dy[row] * vscale_array[Jentry[nz].col];
 #else
-          *(Jentry[nz].valaddr)  = dy[row] * vscale_array[Jentry[nz].col];
+          *Jentry[nz].valaddr = dy[row] * vscale_array[Jentry[nz].col];
 #endif
           nz++;
         }
@@ -372,7 +372,7 @@ PetscErrorCode MatFDColoringApply_AIJ(Mat J, MatFDColoring coloring, Vec x1, voi
           PetscScalar *tmp = Jentry2[nz].valaddr;
           *tmp             = y[row] * dx;
 #else
-          *(Jentry2[nz].valaddr) = y[row] * dx;
+          *Jentry2[nz].valaddr = y[row] * dx;
 #endif
           nz++;
         }
@@ -383,7 +383,7 @@ PetscErrorCode MatFDColoringApply_AIJ(Mat J, MatFDColoring coloring, Vec x1, voi
           PetscScalar *tmp = Jentry[nz].valaddr;
           *tmp             = y[row] * vscale_array[Jentry[nz].col];
 #else
-          *(Jentry[nz].valaddr)  = y[row] * vscale_array[Jentry[nz].col];
+          *Jentry[nz].valaddr = y[row] * vscale_array[Jentry[nz].col];
 #endif
           nz++;
         }
@@ -417,7 +417,7 @@ PetscErrorCode MatFDColoringSetUp_MPIXAIJ(Mat mat, ISColoring iscoloring, MatFDC
 #if defined(PETSC_USE_CTABLE)
   PetscHMapI colmap = NULL;
 #else
-  PetscInt *colmap = NULL;      /* local col number of off-diag col */
+  PetscInt *colmap = NULL; /* local col number of off-diag col */
 #endif
 
   PetscFunctionBegin;
@@ -723,7 +723,6 @@ PetscErrorCode MatFDColoringCreate_MPIXAIJ(Mat mat, ISColoring iscoloring, MatFD
 }
 
 /*@C
-
   MatFDColoringSetValues - takes a matrix in compressed color format and enters the matrix into a PETSc `Mat`
 
   Collective
@@ -731,8 +730,8 @@ PetscErrorCode MatFDColoringCreate_MPIXAIJ(Mat mat, ISColoring iscoloring, MatFD
   Input Parameters:
 + J        - the sparse matrix
 . coloring - created with `MatFDColoringCreate()` and a local coloring
-- y        - column major storage of matrix values with one color of values per column, the number of rows of y should match
-         the number of local rows of `J` and the number of columns is the number of colors.
+- y        - column major storage of matrix values with one color of values per column, the number of rows of `y` should match
+             the number of local rows of `J` and the number of columns is the number of colors.
 
   Level: intermediate
 
@@ -743,7 +742,7 @@ PetscErrorCode MatFDColoringCreate_MPIXAIJ(Mat mat, ISColoring iscoloring, MatFD
 
 .seealso: [](ch_matrices), `Mat`, `MatFDColoringCreate()`, `ISColoring`, `ISColoringCreate()`, `ISColoringSetType()`, `IS_COLORING_LOCAL`, `MatFDColoringSetBlockSize()`
 @*/
-PetscErrorCode MatFDColoringSetValues(Mat J, MatFDColoring coloring, const PetscScalar *y)
+PetscErrorCode MatFDColoringSetValues(Mat J, MatFDColoring coloring, const PetscScalar y[])
 {
   MatEntry2      *Jentry2;
   PetscInt        row, i, nrows_k, l, ncolors, nz = 0, bcols, nbcols = 0;
@@ -763,8 +762,8 @@ PetscErrorCode MatFDColoringSetValues(Mat J, MatFDColoring coloring, const Petsc
   for (i = 0; i < ncolors; i += bcols) {
     nrows_k = nrows[nbcols++];
     for (l = 0; l < nrows_k; l++) {
-      row                      = Jentry2[nz].row; /* local row index */
-      *(Jentry2[nz++].valaddr) = y[row];
+      row                    = Jentry2[nz].row; /* local row index */
+      *Jentry2[nz++].valaddr = y[row];
     }
     y += bcols * coloring->m;
   }

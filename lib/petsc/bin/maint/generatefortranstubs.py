@@ -1,5 +1,4 @@
-#!/usr/bin/env python
-#!/bin/env python
+#!/usr/bin/env python3
 #
 #    Generates fortran stubs for PETSc using the Sowing bfort program
 #
@@ -113,7 +112,6 @@ def FixDir(petscdir,petscarch,parentdir,dir,verbose):
   inbuf = fd.read()
   fd.close()
   cppflags = ""
-  libbase = ""
 
   # new makefile will be created from outbuf
   outbuf  =  '\n'
@@ -123,8 +121,6 @@ def FixDir(petscdir,petscarch,parentdir,dir,verbose):
       outbuf += line + '\n'
     if line.find('CPPFLAGS') >=0:
       outbuf +=   line + '\n'
-    if line.find('LIBBASE') >=0:
-      outbuf +=  line + '\n'
     elif line.find('SUBMANSEC') >=0:
       submansec = line.split('=')[1].lower().strip()
     elif line.find('BFORTSUBMANSEC') >=0:

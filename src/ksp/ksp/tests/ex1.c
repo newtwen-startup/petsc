@@ -37,7 +37,7 @@ int main(int argc, char **args)
   PetscCall(MatAssemblyBegin(C, MAT_FINAL_ASSEMBLY));
   PetscCall(MatAssemblyEnd(C, MAT_FINAL_ASSEMBLY));
 
-  /* create right hand side and solution */
+  /* create right-hand side and solution */
   PetscCall(VecCreate(PETSC_COMM_WORLD, &u));
   PetscCall(VecSetSizes(u, PETSC_DECIDE, N));
   PetscCall(VecSetFromOptions(u));
@@ -114,7 +114,7 @@ int main(int argc, char **args)
 /*TEST
 
     test:
-      args:  -pc_type jacobi -ksp_monitor_short -ksp_gmres_cgs_refinement_type refine_always
+      args: -pc_type jacobi -ksp_monitor_short -ksp_gmres_cgs_refinement_type refine_always
 
     test:
       suffix: 2

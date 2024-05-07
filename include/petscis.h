@@ -146,6 +146,7 @@ PETSC_EXTERN PetscErrorCode ISCreateStride(MPI_Comm, PetscInt, PetscInt, PetscIn
 PETSC_EXTERN PetscErrorCode ISStrideSetStride(IS, PetscInt, PetscInt, PetscInt);
 PETSC_EXTERN PetscErrorCode ISStrideGetInfo(IS, PetscInt *, PetscInt *);
 
+#define IS_LTOGM_FILE_CLASSID 1211217
 PETSC_EXTERN PetscClassId IS_LTOGM_CLASSID;
 
 /*E
@@ -189,30 +190,35 @@ PETSC_EXTERN PetscErrorCode ISLocalToGlobalMappingCreateSF(PetscSF, PetscInt, IS
 PETSC_EXTERN PetscErrorCode ISLocalToGlobalMappingSetFromOptions(ISLocalToGlobalMapping);
 PETSC_EXTERN PetscErrorCode ISLocalToGlobalMappingSetUp(ISLocalToGlobalMapping);
 PETSC_EXTERN PetscErrorCode ISLocalToGlobalMappingView(ISLocalToGlobalMapping, PetscViewer);
+PETSC_EXTERN PetscErrorCode ISLocalToGlobalMappingLoad(ISLocalToGlobalMapping, PetscViewer);
 PETSC_EXTERN PetscErrorCode ISLocalToGlobalMappingViewFromOptions(ISLocalToGlobalMapping, PetscObject, const char[]);
-
+PETSC_EXTERN PetscErrorCode ISLocalToGlobalMappingConcatenate(MPI_Comm, PetscInt, const ISLocalToGlobalMapping[], ISLocalToGlobalMapping *);
+PETSC_EXTERN PetscErrorCode ISLocalToGlobalMappingDuplicate(ISLocalToGlobalMapping, ISLocalToGlobalMapping *);
 PETSC_EXTERN PetscErrorCode ISLocalToGlobalMappingDestroy(ISLocalToGlobalMapping *);
+PETSC_EXTERN PetscErrorCode ISLocalToGlobalMappingGetSize(ISLocalToGlobalMapping, PetscInt *);
+PETSC_EXTERN PetscErrorCode ISLocalToGlobalMappingGetIndices(ISLocalToGlobalMapping, const PetscInt **);
+PETSC_EXTERN PetscErrorCode ISLocalToGlobalMappingRestoreIndices(ISLocalToGlobalMapping, const PetscInt **);
+PETSC_EXTERN PetscErrorCode ISLocalToGlobalMappingGetBlockIndices(ISLocalToGlobalMapping, const PetscInt **);
+PETSC_EXTERN PetscErrorCode ISLocalToGlobalMappingRestoreBlockIndices(ISLocalToGlobalMapping, const PetscInt **);
+PETSC_EXTERN PetscErrorCode ISLocalToGlobalMappingGetBlockSize(ISLocalToGlobalMapping, PetscInt *);
+PETSC_EXTERN PetscErrorCode ISLocalToGlobalMappingSetBlockSize(ISLocalToGlobalMapping, PetscInt);
+
 PETSC_EXTERN PetscErrorCode ISLocalToGlobalMappingApply(ISLocalToGlobalMapping, PetscInt, const PetscInt[], PetscInt[]);
 PETSC_EXTERN PetscErrorCode ISLocalToGlobalMappingApplyBlock(ISLocalToGlobalMapping, PetscInt, const PetscInt[], PetscInt[]);
 PETSC_EXTERN PetscErrorCode ISLocalToGlobalMappingApplyIS(ISLocalToGlobalMapping, IS, IS *);
 PETSC_EXTERN PetscErrorCode ISGlobalToLocalMappingApply(ISLocalToGlobalMapping, ISGlobalToLocalMappingMode, PetscInt, const PetscInt[], PetscInt *, PetscInt[]);
 PETSC_EXTERN PetscErrorCode ISGlobalToLocalMappingApplyBlock(ISLocalToGlobalMapping, ISGlobalToLocalMappingMode, PetscInt, const PetscInt[], PetscInt *, PetscInt[]);
 PETSC_EXTERN PetscErrorCode ISGlobalToLocalMappingApplyIS(ISLocalToGlobalMapping, ISGlobalToLocalMappingMode, IS, IS *);
-PETSC_EXTERN PetscErrorCode ISLocalToGlobalMappingGetSize(ISLocalToGlobalMapping, PetscInt *);
+
 PETSC_EXTERN PetscErrorCode ISLocalToGlobalMappingGetNodeInfo(ISLocalToGlobalMapping, PetscInt *, PetscInt *[], PetscInt **[]);
 PETSC_EXTERN PetscErrorCode ISLocalToGlobalMappingRestoreNodeInfo(ISLocalToGlobalMapping, PetscInt *, PetscInt *[], PetscInt **[]);
 PETSC_EXTERN PetscErrorCode ISLocalToGlobalMappingGetInfo(ISLocalToGlobalMapping, PetscInt *, PetscInt *[], PetscInt *[], PetscInt **[]);
 PETSC_EXTERN PetscErrorCode ISLocalToGlobalMappingRestoreInfo(ISLocalToGlobalMapping, PetscInt *, PetscInt *[], PetscInt *[], PetscInt **[]);
+PETSC_EXTERN PetscErrorCode ISLocalToGlobalMappingGetBlockNodeInfo(ISLocalToGlobalMapping, PetscInt *, PetscInt *[], PetscInt **[]);
+PETSC_EXTERN PetscErrorCode ISLocalToGlobalMappingRestoreBlockNodeInfo(ISLocalToGlobalMapping, PetscInt *, PetscInt *[], PetscInt **[]);
 PETSC_EXTERN PetscErrorCode ISLocalToGlobalMappingGetBlockInfo(ISLocalToGlobalMapping, PetscInt *, PetscInt *[], PetscInt *[], PetscInt **[]);
 PETSC_EXTERN PetscErrorCode ISLocalToGlobalMappingRestoreBlockInfo(ISLocalToGlobalMapping, PetscInt *, PetscInt *[], PetscInt *[], PetscInt **[]);
-PETSC_EXTERN PetscErrorCode ISLocalToGlobalMappingGetIndices(ISLocalToGlobalMapping, const PetscInt **);
-PETSC_EXTERN PetscErrorCode ISLocalToGlobalMappingRestoreIndices(ISLocalToGlobalMapping, const PetscInt **);
-PETSC_EXTERN PetscErrorCode ISLocalToGlobalMappingGetBlockIndices(ISLocalToGlobalMapping, const PetscInt **);
-PETSC_EXTERN PetscErrorCode ISLocalToGlobalMappingRestoreBlockIndices(ISLocalToGlobalMapping, const PetscInt **);
-PETSC_EXTERN PetscErrorCode ISLocalToGlobalMappingConcatenate(MPI_Comm, PetscInt, const ISLocalToGlobalMapping[], ISLocalToGlobalMapping *);
-PETSC_EXTERN PetscErrorCode ISLocalToGlobalMappingGetBlockSize(ISLocalToGlobalMapping, PetscInt *);
-PETSC_EXTERN PetscErrorCode ISLocalToGlobalMappingSetBlockSize(ISLocalToGlobalMapping, PetscInt);
-PETSC_EXTERN PetscErrorCode ISLocalToGlobalMappingDuplicate(ISLocalToGlobalMapping, ISLocalToGlobalMapping *);
+PETSC_EXTERN PetscErrorCode ISLocalToGlobalMappingGetBlockMultiLeavesSF(ISLocalToGlobalMapping, PetscSF *);
 
 /*E
    ISColoringType - determines if the coloring is for the entire parallel grid/graph/matrix
@@ -304,10 +310,8 @@ static inline PetscErrorCode PetscLayoutFindOwner(PetscLayout map, PetscInt idx,
 
   PetscFunctionBegin;
   *owner = -1; /* GCC erroneously issues warning about possibly uninitialized use when error condition */
-#if defined(PETSC_USE_DEBUG)
-  PetscCheck((map->n >= 0) && (map->N >= 0) && (map->range), PETSC_COMM_SELF, PETSC_ERR_ARG_WRONGSTATE, "PetscLayoutSetUp() must be called first");
-  PetscCheck(idx >= 0 && idx <= map->N, PETSC_COMM_SELF, PETSC_ERR_ARG_OUTOFRANGE, "Index %" PetscInt_FMT " is out of range", idx);
-#endif
+  PetscAssert((map->n >= 0) && (map->N >= 0) && (map->range), PETSC_COMM_SELF, PETSC_ERR_ARG_WRONGSTATE, "PetscLayoutSetUp() must be called first");
+  PetscAssert(idx >= 0 && idx <= map->N, PETSC_COMM_SELF, PETSC_ERR_ARG_OUTOFRANGE, "Index %" PetscInt_FMT " is out of range", idx);
   hi = map->size;
   while (hi - lo > 1) {
     t = lo + (hi - lo) / 2;
@@ -340,10 +344,8 @@ static inline PetscErrorCode PetscLayoutFindOwnerIndex(PetscLayout map, PetscInt
   PetscMPIInt lo = 0, hi, t;
 
   PetscFunctionBegin;
-#if defined(PETSC_USE_DEBUG)
-  PetscCheck((map->n >= 0) && (map->N >= 0) && (map->range), PETSC_COMM_SELF, PETSC_ERR_ARG_WRONGSTATE, "PetscLayoutSetUp() must be called first");
-  PetscCheck(idx >= 0 && idx <= map->N, PETSC_COMM_SELF, PETSC_ERR_ARG_OUTOFRANGE, "Index %" PetscInt_FMT " is out of range", idx);
-#endif
+  PetscAssert((map->n >= 0) && (map->N >= 0) && (map->range), PETSC_COMM_SELF, PETSC_ERR_ARG_WRONGSTATE, "PetscLayoutSetUp() must be called first");
+  PetscAssert(idx >= 0 && idx <= map->N, PETSC_COMM_SELF, PETSC_ERR_ARG_OUTOFRANGE, "Index %" PetscInt_FMT " is out of range", idx);
   hi = map->size;
   while (hi - lo > 1) {
     t = lo + (hi - lo) / 2;

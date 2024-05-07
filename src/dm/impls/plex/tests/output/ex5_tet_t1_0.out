@@ -70,7 +70,7 @@ Label 'cohesive':
 PetscSection Object: 1 MPI process
   type not yet set
 2 fields
-  field 0 with 3 components
+  field 0 "displacement" with 3 components
 Process 0:
   (   0) dim  0 offset   0
   (   1) dim  0 offset   0
@@ -129,7 +129,7 @@ Process 0:
   (  54) dim  0 offset  33
   (  55) dim  0 offset  36
   (  56) dim  0 offset  39
-  field 1 with 3 components
+  field 1 "fault traction" with 3 components
 Process 0:
   (   0) dim  0 offset   0
   (   1) dim  0 offset   0
@@ -210,13 +210,13 @@ Vec Object: Local Solution 1 MPI process
 1.
 0.
 0.
+1.
 0.
+1.
+2.
 0.
-0.
-0.
-0.
-0.
-0.
+2.
+1.
 0.
 0.
 0.
@@ -319,17 +319,17 @@ Vec Object: Local Residual 1 MPI process
 0.
 -0.0833333
 -1.23358e-17
-0.5
-0.75
+0.0833333
+0.0833333
 0.
-0.333333
-0.5
+0.
+-3.70074e-17
 -3.08395e-18
-0.833333
-0.75
+0.0833333
+0.0833333
 -3.08395e-18
-0.333333
-0.333333
+0.166667
+0.166667
 Mat Object: Jacobian 1 MPI process
   type: seqaij
 row 0: (0, 0.)  (1, 0.)  (2, 0.)  (3, 0.)  (4, 0.)  (5, 0.)  (6, 0.)  (7, 0.)  (8, 0.)  (9, 0.)  (10, 0.)  (11, 0.)  (12, 0.)  (13, 0.)  (14, 0.) 

@@ -103,7 +103,6 @@ static PetscErrorCode ProcessOptions(MPI_Comm comm, AppCtx *options)
   PetscCall(PetscOptionsRealArray("-source_loc", "The source location", "ex18.c", options->source, &d, &flg));
   PetscCheck(!flg || d == 2, PETSC_COMM_SELF, PETSC_ERR_ARG_WRONG, "Must give dim coordinates for the source location, not %" PetscInt_FMT, d);
   PetscOptionsEnd();
-
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
@@ -806,7 +805,7 @@ static PetscErrorCode CreateDM(MPI_Comm comm, AppCtx *user, DM *dm)
   }
   /* Localize coordinates */
   PetscCall(DMLocalizeCoordinates(*dm));
-  PetscCall(PetscObjectSetName((PetscObject)(*dm), "Mesh"));
+  PetscCall(PetscObjectSetName((PetscObject)*dm, "Mesh"));
   PetscCall(DMViewFromOptions(*dm, NULL, "-dm_view"));
   /* Setup problem */
   PetscCall(SetupDiscretization(*dm, user));
@@ -1020,10 +1019,8 @@ int main(int argc, char **argv)
   Vec       u;
   AppCtx    user;
   PetscReal t0, t = 0.0;
-  void     *ctxs[2];
+  void     *ctxs[2] = {&t, &t};
 
-  ctxs[0] = &t;
-  ctxs[1] = &t;
   PetscFunctionBeginUser;
   PetscCall(PetscInitialize(&argc, &argv, (char *)0, help));
   comm                    = PETSC_COMM_WORLD;
@@ -1099,7 +1096,7 @@ int main(int argc, char **argv)
     test:
       suffix: p1p1
       requires: !complex !single
-      args: -velocity_petscspace_degree 1 -porosity_petscspace_degree 1 -snes_fd_color -snes_fd_color_use_mat -mat_coloring_type greedy -pc_factor_shift_type nonzero -ts_monitor -snes_error_if_not_converged -ksp_error_if_not_converged -dmts_check
+      args: -velocity_petscspace_degree 1 -porosity_petscspace_degree 1 -snes_fd_color -snes_fd_color_use_mat -mat_coloring_type greedy -pc_type ilu -pc_factor_shift_type nonzero -ts_monitor -snes_error_if_not_converged -ksp_error_if_not_converged -dmts_check
     test:
       suffix: p1p1_xper
       requires: !complex !single
@@ -1119,7 +1116,7 @@ int main(int argc, char **argv)
     test:
       suffix: p2p1
       requires: !complex !single
-      args: -velocity_petscspace_degree 2 -porosity_petscspace_degree 1 -snes_fd_color -snes_fd_color_use_mat -mat_coloring_type greedy -ts_monitor   -snes_error_if_not_converged -ksp_error_if_not_converged -dmts_check
+      args: -velocity_petscspace_degree 2 -porosity_petscspace_degree 1 -snes_fd_color -snes_fd_color_use_mat -mat_coloring_type greedy -ts_monitor -snes_error_if_not_converged -ksp_error_if_not_converged -dmts_check
     test:
       suffix: p2p1_xyper
       requires: !complex !single
@@ -1176,19 +1173,19 @@ int main(int argc, char **argv)
       suffix: adv_delta_yper_fim_0
       requires: !complex
       TODO: broken
-      args: -dm_plex_box_bd none,periodic -use_fv -use_implicit -velocity_petscspace_degree 0 -velocity_dist constant -porosity_dist delta -inflow_state 0.0 -ts_type mimex -ts_max_time 5.0 -ts_max_steps 20 -ts_dt 0.333333 -bc_inflow 2 -bc_outflow 4 -ts_view -monitor Error -dm_view   -snes_fd_color -snes_fd_color_use_mat -mat_coloring_type greedy -mat_coloring_greedy_symmetric 0 -snes_rtol 1.0e-7 -pc_type lu -snes_converged_reason
+      args: -dm_plex_box_bd none,periodic -use_fv -use_implicit -velocity_petscspace_degree 0 -velocity_dist constant -porosity_dist delta -inflow_state 0.0 -ts_type mimex -ts_max_time 5.0 -ts_max_steps 20 -ts_dt 0.333333 -bc_inflow 2 -bc_outflow 4 -ts_view -monitor Error -dm_view -snes_fd_color -snes_fd_color_use_mat -mat_coloring_type greedy -mat_coloring_greedy_symmetric 0 -snes_rtol 1.0e-7 -pc_type lu -snes_converged_reason
 
     test:
       suffix: adv_delta_yper_fim_1
       requires: !complex
       TODO: broken
-      args: -dm_plex_box_bd none,periodic -use_fv -use_implicit -velocity_petscspace_degree 1 -velocity_dist constant -porosity_dist delta -inflow_state 0.0 -ts_type mimex -ts_max_time 5.0 -ts_max_steps 20 -ts_dt 0.333333 -bc_inflow 2 -bc_outflow 4 -ts_view -monitor Error -dm_view   -snes_fd_color -snes_fd_color_use_mat -mat_coloring_type greedy -mat_coloring_greedy_symmetric 0 -snes_rtol 1.0e-7 -pc_type lu -snes_converged_reason -snes_linesearch_type basic
+      args: -dm_plex_box_bd none,periodic -use_fv -use_implicit -velocity_petscspace_degree 1 -velocity_dist constant -porosity_dist delta -inflow_state 0.0 -ts_type mimex -ts_max_time 5.0 -ts_max_steps 20 -ts_dt 0.333333 -bc_inflow 2 -bc_outflow 4 -ts_view -monitor Error -dm_view -snes_fd_color -snes_fd_color_use_mat -mat_coloring_type greedy -mat_coloring_greedy_symmetric 0 -snes_rtol 1.0e-7 -pc_type lu -snes_converged_reason -snes_linesearch_type basic
 
     test:
       suffix: adv_delta_yper_fim_2
       requires: !complex
       TODO: broken
-      args: -dm_plex_box_bd none,periodic -use_fv -use_implicit -velocity_petscspace_degree 2 -velocity_dist constant -porosity_dist delta -inflow_state 0.0 -ts_type mimex -ts_max_time 5.0 -ts_max_steps 20 -ts_dt 0.333333 -bc_inflow 2 -bc_outflow 4 -ts_view -monitor Error -dm_view   -snes_fd_color -snes_fd_color_use_mat -mat_coloring_type greedy -mat_coloring_greedy_symmetric 0 -snes_rtol 1.0e-7 -pc_type lu -snes_converged_reason -snes_linesearch_type basic
+      args: -dm_plex_box_bd none,periodic -use_fv -use_implicit -velocity_petscspace_degree 2 -velocity_dist constant -porosity_dist delta -inflow_state 0.0 -ts_type mimex -ts_max_time 5.0 -ts_max_steps 20 -ts_dt 0.333333 -bc_inflow 2 -bc_outflow 4 -ts_view -monitor Error -dm_view -snes_fd_color -snes_fd_color_use_mat -mat_coloring_type greedy -mat_coloring_greedy_symmetric 0 -snes_rtol 1.0e-7 -pc_type lu -snes_converged_reason -snes_linesearch_type basic
 
     test:
       suffix: adv_delta_yper_im_0
@@ -1231,14 +1228,14 @@ int main(int argc, char **argv)
       suffix: adv_delta_yper_im_6
       requires: !complex
       TODO: broken
-      args: -dm_plex_box_bd none,periodic -use_fv -use_implicit -velocity_petscspace_degree 2 -velocity_dist constant -porosity_dist delta -inflow_state 0.0 -ts_type mimex -ts_max_time 5.0 -ts_max_steps 20 -ts_dt 0.333333 -bc_inflow 2 -bc_outflow 4 -ts_view -monitor Error -dm_view   -snes_fd_color -snes_fd_color_use_mat -mat_coloring_type greedy -snes_rtol 1.0e-7 -pc_type svd -snes_converged_reason
+      args: -dm_plex_box_bd none,periodic -use_fv -use_implicit -velocity_petscspace_degree 2 -velocity_dist constant -porosity_dist delta -inflow_state 0.0 -ts_type mimex -ts_max_time 5.0 -ts_max_steps 20 -ts_dt 0.333333 -bc_inflow 2 -bc_outflow 4 -ts_view -monitor Error -dm_view -snes_fd_color -snes_fd_color_use_mat -mat_coloring_type greedy -snes_rtol 1.0e-7 -pc_type svd -snes_converged_reason
     # 2D Advection, magma benchmark 1
 
     test:
       suffix: adv_delta_shear_im_0
       requires: !complex
       TODO: broken
-      args: -dm_plex_box_bd periodic,none -dm_refine 2 -use_fv -use_implicit -velocity_petscspace_degree 1 -velocity_dist shear -porosity_dist   delta -inflow_state 0.0 -ts_type mimex -ts_max_time 5.0 -ts_max_steps 20 -ts_dt 0.333333 -bc_inflow 1,3 -ts_view -dm_view -snes_fd_color -snes_fd_color_use_mat -mat_coloring_type greedy -snes_rtol 1.0e-7 -pc_type lu -snes_converged_reason -source_loc 0.458333,0.708333
+      args: -dm_plex_box_bd periodic,none -dm_refine 2 -use_fv -use_implicit -velocity_petscspace_degree 1 -velocity_dist shear -porosity_dist delta -inflow_state 0.0 -ts_type mimex -ts_max_time 5.0 -ts_max_steps 20 -ts_dt 0.333333 -bc_inflow 1,3 -ts_view -dm_view -snes_fd_color -snes_fd_color_use_mat -mat_coloring_type greedy -snes_rtol 1.0e-7 -pc_type lu -snes_converged_reason -source_loc 0.458333,0.708333
     # 2D Advection, box, gaussian
 
     test:
@@ -1251,7 +1248,7 @@ int main(int argc, char **argv)
       suffix: adv_gauss_im
       requires: !complex
       TODO: broken
-      args: -use_fv -use_implicit -velocity_dist constant -porosity_dist gaussian -inflow_state 0.0 -ts_type beuler -ts_max_time 2.0 -ts_max_steps   100 -ts_dt 0.01 -bc_inflow 1 -bc_outflow 3 -ts_view -dm_view -snes_fd_color -snes_fd_color_use_mat -mat_coloring_type greedy -snes_rtol 1.0e-7
+      args: -use_fv -use_implicit -velocity_dist constant -porosity_dist gaussian -inflow_state 0.0 -ts_type beuler -ts_max_time 2.0 -ts_max_steps 100 -ts_dt 0.01 -bc_inflow 1 -bc_outflow 3 -ts_view -dm_view -snes_fd_color -snes_fd_color_use_mat -mat_coloring_type greedy -snes_rtol 1.0e-7
 
     test:
       suffix: adv_gauss_im_1
@@ -1276,7 +1273,7 @@ int main(int argc, char **argv)
       suffix: adv_harm_0
       requires: !complex
       TODO: broken memory corruption
-      args: -velocity_petscspace_degree 2 -use_fv -velocity_dist harmonic -porosity_dist gaussian -ts_type beuler -ts_max_time 2.0 -ts_max_steps   1000 -ts_dt 0.993392 -bc_inflow 1,2,4 -bc_outflow 3 -use_implicit -snes_fd_color -snes_fd_color_use_mat -mat_coloring_type greedy -ksp_max_it   100 -ts_view -dm_view -snes_converged_reason -ksp_converged_reason -snes_monitor -dmts_check
+      args: -velocity_petscspace_degree 2 -use_fv -velocity_dist harmonic -porosity_dist gaussian -ts_type beuler -ts_max_time 2.0 -ts_max_steps 1000 -ts_dt 0.993392 -bc_inflow 1,2,4 -bc_outflow 3 -use_implicit -snes_fd_color -snes_fd_color_use_mat -mat_coloring_type greedy -ksp_max_it 100 -ts_view -dm_view -snes_converged_reason -ksp_converged_reason -snes_monitor -dmts_check
 
   #   Must check that FV BCs propagate to coarse meshes
   #   Must check that FV BC ids propagate to coarse meshes

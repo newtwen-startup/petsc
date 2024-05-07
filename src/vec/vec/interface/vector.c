@@ -8,7 +8,7 @@
 /* Logging support */
 PetscClassId  VEC_CLASSID;
 PetscLogEvent VEC_View, VEC_Max, VEC_Min, VEC_Dot, VEC_MDot, VEC_TDot;
-PetscLogEvent VEC_Norm, VEC_Normalize, VEC_Scale, VEC_Copy, VEC_Set, VEC_AXPY, VEC_AYPX, VEC_WAXPY;
+PetscLogEvent VEC_Norm, VEC_Normalize, VEC_Scale, VEC_Shift, VEC_Copy, VEC_Set, VEC_AXPY, VEC_AYPX, VEC_WAXPY;
 PetscLogEvent VEC_MTDot, VEC_MAXPY, VEC_Swap, VEC_AssemblyBegin, VEC_ScatterBegin, VEC_ScatterEnd;
 PetscLogEvent VEC_AssemblyEnd, VEC_PointwiseMult, VEC_SetValues, VEC_Load, VEC_SetPreallocateCOO, VEC_SetValuesCOO;
 PetscLogEvent VEC_SetRandom, VEC_ReduceArithmetic, VEC_ReduceCommunication, VEC_ReduceBegin, VEC_ReduceEnd, VEC_Ops;
@@ -96,7 +96,8 @@ PetscErrorCode VecGetLocalToGlobalMapping(Vec X, ISLocalToGlobalMapping *mapping
   PetscValidHeaderSpecific(X, VEC_CLASSID, 1);
   PetscValidType(X, 1);
   PetscAssertPointer(mapping, 2);
-  *mapping = X->map->mapping;
+  if (X->ops->getlocaltoglobalmapping) PetscUseTypeMethod(X, getlocaltoglobalmapping, mapping);
+  else *mapping = X->map->mapping;
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
@@ -547,7 +548,7 @@ PetscErrorCode VecDuplicate(Vec v, Vec *newv)
     PetscCall(VecBindToCPU(*newv, PETSC_TRUE));
   }
 #endif
-  PetscCall(PetscObjectStateIncrease((PetscObject)(*newv)));
+  PetscCall(PetscObjectStateIncrease((PetscObject)*newv));
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
@@ -568,8 +569,8 @@ PetscErrorCode VecDestroy(Vec *v)
   PetscFunctionBegin;
   PetscAssertPointer(v, 1);
   if (!*v) PetscFunctionReturn(PETSC_SUCCESS);
-  PetscValidHeaderSpecific((*v), VEC_CLASSID, 1);
-  if (--((PetscObject)(*v))->refct > 0) {
+  PetscValidHeaderSpecific(*v, VEC_CLASSID, 1);
+  if (--((PetscObject)*v)->refct > 0) {
     *v = NULL;
     PetscFunctionReturn(PETSC_SUCCESS);
   }
@@ -733,7 +734,7 @@ PetscErrorCode VecViewFromOptions(Vec A, PetscObject obj, const char name[])
   In the debugger you can do call `VecView`(v,0) to display the vector. (The same holds for any PETSc object viewer).
 
   Notes for binary viewer:
-  If you pass multiple vectors to a binary viewer you can read them back in in the same order
+  If you pass multiple vectors to a binary viewer you can read them back in the same order
   with `VecLoad()`.
 
   If the blocksize of the vector is greater than one then you must provide a unique prefix to
@@ -912,7 +913,7 @@ PetscErrorCode VecGetLocalSize(Vec x, PetscInt *size)
 /*@C
   VecGetOwnershipRange - Returns the range of indices owned by
   this process. The vector is laid out with the
-  first n1 elements on the first processor, next n2 elements on the
+  first `n1` elements on the first processor, next `n2` elements on the
   second, etc.  For certain parallel layouts this range may not be
   well defined.
 
@@ -927,13 +928,19 @@ PetscErrorCode VecGetLocalSize(Vec x, PetscInt *size)
 
   Level: beginner
 
-  Note:
+  Notes:
+  If the `Vec` was obtained from a `DM` with `DMCreateGlobalVector()`, then the range values are determined by the specific `DM`.
+
+  If the `Vec` was created directly the range values are determined by the local size passed to `VecSetSizes()` or `VecCreateMPI()`.
+  If `PETSC_DECIDE` was passed as the local size, then the vector uses default values for the range using `PetscSplitOwnership()`.
+
   The high argument is one more than the last element stored locally.
 
-  Fortran Notes:
-  `PETSC_NULL_INTEGER` should be used instead of NULL
+  For certain `DM`, such as `DMDA`, it is better to use `DM` specific routines, such as `DMDAGetGhostCorners()`, to determine
+  the local values in the vector.
 
-.seealso: [](ch_vectors), `Vec`, `MatGetOwnershipRange()`, `MatGetOwnershipRanges()`, `VecGetOwnershipRanges()`
+.seealso: [](ch_vectors), `Vec`, `MatGetOwnershipRange()`, `MatGetOwnershipRanges()`, `VecGetOwnershipRanges()`, `PetscSplitOwnership()`,
+          `VecSetSizes()`, `VecCreateMPI()`, `PetscLayout`, `DMDAGetGhostCorners()`, `DM`
 @*/
 PetscErrorCode VecGetOwnershipRange(Vec x, PetscInt *low, PetscInt *high)
 {
@@ -950,7 +957,7 @@ PetscErrorCode VecGetOwnershipRange(Vec x, PetscInt *low, PetscInt *high)
 /*@C
   VecGetOwnershipRanges - Returns the range of indices owned by EACH processor,
   The vector is laid out with the
-  first n1 elements on the first processor, next n2 elements on the
+  first `n1` elements on the first processor, next `n2` elements on the
   second, etc.  For certain parallel layouts this range may not be
   well defined.
 
@@ -960,19 +967,30 @@ PetscErrorCode VecGetOwnershipRange(Vec x, PetscInt *low, PetscInt *high)
 . x - the vector
 
   Output Parameter:
-. ranges - array of length size+1 with the start and end+1 for each process
+. ranges - array of length `size` + 1 with the start and end+1 for each process
 
   Level: beginner
 
   Notes:
+  If the `Vec` was obtained from a `DM` with `DMCreateGlobalVector()`, then the range values are determined by the specific `DM`.
+
+  If the `Vec` was created directly the range values are determined by the local size passed to `VecSetSizes()` or `VecCreateMPI()`.
+  If `PETSC_DECIDE` was passed as the local size, then the vector uses default values for the range using `PetscSplitOwnership()`.
+
   The high argument is one more than the last element stored locally.
 
-  If the ranges are used after all vectors that share the ranges has been destroyed then the program will crash accessing ranges[].
+  For certain `DM`, such as `DMDA`, it is better to use `DM` specific routines, such as `DMDAGetGhostCorners()`, to determine
+  the local values in the vector.
+
+  The high argument is one more than the last element stored locally.
+
+  If `ranges` are used after all vectors that share the ranges has been destroyed, then the program will crash accessing `ranges`.
 
   Fortran Notes:
-  You must PASS in an array of length size+1
+  You must PASS in an array of length `size` + 1, where `size` is the size of the communicator owning the vector
 
-.seealso: [](ch_vectors), `Vec`, `MatGetOwnershipRange()`, `MatGetOwnershipRanges()`, `VecGetOwnershipRange()`
+.seealso: [](ch_vectors), `Vec`, `MatGetOwnershipRange()`, `MatGetOwnershipRanges()`, `VecGetOwnershipRange()`, `PetscSplitOwnership()`,
+          `VecSetSizes()`, `VecCreateMPI()`, `PetscLayout`, `DMDAGetGhostCorners()`, `DM`
 @*/
 PetscErrorCode VecGetOwnershipRanges(Vec x, const PetscInt *ranges[])
 {
@@ -1031,8 +1049,6 @@ PetscErrorCode VecSetOption(Vec x, VecOption op, PetscBool flag)
 PetscErrorCode VecDuplicateVecs_Default(Vec w, PetscInt m, Vec *V[])
 {
   PetscFunctionBegin;
-  PetscValidHeaderSpecific(w, VEC_CLASSID, 1);
-  PetscAssertPointer(V, 3);
   PetscCheck(m > 0, PETSC_COMM_SELF, PETSC_ERR_ARG_OUTOFRANGE, "m must be > 0: m = %" PetscInt_FMT, m);
   PetscCall(PetscMalloc1(m, V));
   for (PetscInt i = 0; i < m; i++) PetscCall(VecDuplicate(w, *V + i));
@@ -1458,7 +1474,11 @@ PetscErrorCode VecSetFromOptions(Vec vec)
 
   If one processor calls this with `N` of `PETSC_DETERMINE` then all processors must, otherwise the program will hang.
 
-.seealso: [](ch_vectors), `Vec`, `VecGetSize()`, `PetscSplitOwnership()`
+  If `n` is not `PETSC_DECIDE`, then the value determines the `PetscLayout` of the vector and the ranges returned by
+  `VecGetOwnershipRange()` and `VecGetOwnershipRanges()`
+
+.seealso: [](ch_vectors), `Vec`, `VecCreate()`, `VecCreateSeq()`, `VecCreateMPI()`, `VecGetSize()`, `PetscSplitOwnership()`, `PetscLayout`,
+          `VecGetOwnershipRange()`, `VecGetOwnershipRanges()`, `MatSetSizes()`
 @*/
 PetscErrorCode VecSetSizes(Vec v, PetscInt n, PetscInt N)
 {
@@ -1835,7 +1855,7 @@ PetscErrorCode VecStashViewFromOptions(Vec obj, PetscObject bobj, const char opt
     PetscCall(PetscViewerPushFormat(viewer, format));
     PetscCall(VecStashView(obj, viewer));
     PetscCall(PetscViewerPopFormat(viewer));
-    PetscCall(PetscViewerDestroy(&viewer));
+    PetscCall(PetscOptionsRestoreViewer(&viewer));
   }
   PetscFunctionReturn(PETSC_SUCCESS);
 }

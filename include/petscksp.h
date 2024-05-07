@@ -971,14 +971,6 @@ typedef enum {
 } MatSchurComplementAinvType;
 PETSC_EXTERN const char *const MatSchurComplementAinvTypes[];
 
-typedef enum {
-  MAT_LMVM_SYMBROYDEN_SCALE_NONE     = 0,
-  MAT_LMVM_SYMBROYDEN_SCALE_SCALAR   = 1,
-  MAT_LMVM_SYMBROYDEN_SCALE_DIAGONAL = 2,
-  MAT_LMVM_SYMBROYDEN_SCALE_USER     = 3
-} MatLMVMSymBroydenScaleType;
-PETSC_EXTERN const char *const MatLMVMSymBroydenScaleTypes[];
-
 PETSC_EXTERN PetscErrorCode MatCreateSchurComplement(Mat, Mat, Mat, Mat, Mat, Mat *);
 PETSC_EXTERN PetscErrorCode MatSchurComplementGetKSP(Mat, KSP *);
 PETSC_EXTERN PetscErrorCode MatSchurComplementSetKSP(Mat, KSP);
@@ -994,6 +986,9 @@ PETSC_EXTERN PetscErrorCode MatCreateSchurComplementPmat(Mat, Mat, Mat, Mat, Mat
 
 PETSC_EXTERN PetscErrorCode MatCreateLMVMDFP(MPI_Comm, PetscInt, PetscInt, Mat *);
 PETSC_EXTERN PetscErrorCode MatCreateLMVMBFGS(MPI_Comm, PetscInt, PetscInt, Mat *);
+PETSC_EXTERN PetscErrorCode MatCreateLMVMDBFGS(MPI_Comm, PetscInt, PetscInt, Mat *);
+PETSC_EXTERN PetscErrorCode MatCreateLMVMDDFP(MPI_Comm, PetscInt, PetscInt, Mat *);
+PETSC_EXTERN PetscErrorCode MatCreateLMVMDQN(MPI_Comm, PetscInt, PetscInt, Mat *);
 PETSC_EXTERN PetscErrorCode MatCreateLMVMSR1(MPI_Comm, PetscInt, PetscInt, Mat *);
 PETSC_EXTERN PetscErrorCode MatCreateLMVMBroyden(MPI_Comm, PetscInt, PetscInt, Mat *);
 PETSC_EXTERN PetscErrorCode MatCreateLMVMBadBroyden(MPI_Comm, PetscInt, PetscInt, Mat *);
@@ -1018,29 +1013,117 @@ PETSC_EXTERN PetscErrorCode MatLMVMGetJ0(Mat, Mat *);
 PETSC_EXTERN PetscErrorCode MatLMVMGetJ0PC(Mat, PC *);
 PETSC_EXTERN PetscErrorCode MatLMVMGetJ0KSP(Mat, KSP *);
 PETSC_EXTERN PetscErrorCode MatLMVMSetHistorySize(Mat, PetscInt);
+PETSC_EXTERN PetscErrorCode MatLMVMGetHistorySize(Mat, PetscInt *);
 PETSC_EXTERN PetscErrorCode MatLMVMGetUpdateCount(Mat, PetscInt *);
 PETSC_EXTERN PetscErrorCode MatLMVMGetRejectCount(Mat, PetscInt *);
 PETSC_EXTERN PetscErrorCode MatLMVMSymBroydenSetDelta(Mat, PetscScalar);
+
+/*E
+  MatLMVMSymBroydenScaleType - Scaling type for symmetric Broyden.
+
+  Values:
++ `MAT_LMVM_SYMBROYDEN_SCALE_NONE`     - No scaling
+. `MAT_LMVM_SYMBROYDEN_SCALE_SCALAR`   - scalar scaling
+. `MAT_LMVM_SYMBROYDEN_SCALE_DIAGONAL` - diagonal scaling
+- `MAT_LMVM_SYMBROYDEN_SCALE_USER`     - user-provided scale option
+
+  Level: intermediate
+
+.seealso: [](ch_matrices), `MatLMVM`, `MatLMVMSymBroydenSetScaleType()`
+E*/
+typedef enum {
+  MAT_LMVM_SYMBROYDEN_SCALE_NONE     = 0,
+  MAT_LMVM_SYMBROYDEN_SCALE_SCALAR   = 1,
+  MAT_LMVM_SYMBROYDEN_SCALE_DIAGONAL = 2,
+  MAT_LMVM_SYMBROYDEN_SCALE_USER     = 3
+} MatLMVMSymBroydenScaleType;
+PETSC_EXTERN const char *const MatLMVMSymBroydenScaleTypes[];
+
 PETSC_EXTERN PetscErrorCode MatLMVMSymBroydenSetScaleType(Mat, MatLMVMSymBroydenScaleType);
+
+/*E
+  MatLMVMDenseType - Memory storage strategy for dense variants `MATLMVM`.
+
+  Values:
++ `MAT_LMVM_DENSE_REORDER` - reorders memory to minimize kernel launch
+- `MAT_LMVM_DENSE_INPLACE` - computes inplace to minimize memory movement
+
+  Level: intermediate
+
+.seealso: [](ch_matrices), `MatLMVM`, `MatLMVMDenseSetType()`
+E*/
+typedef enum {
+  MAT_LMVM_DENSE_REORDER,
+  MAT_LMVM_DENSE_INPLACE
+} MatLMVMDenseType;
+PETSC_EXTERN const char *const MatLMVMDenseTypes[];
+
+PETSC_EXTERN PetscErrorCode MatLMVMDenseSetType(Mat, MatLMVMDenseType);
 
 PETSC_EXTERN PetscErrorCode KSPSetDM(KSP, DM);
 PETSC_EXTERN PetscErrorCode KSPSetDMActive(KSP, PetscBool);
 PETSC_EXTERN PetscErrorCode KSPGetDM(KSP, DM *);
 PETSC_EXTERN PetscErrorCode KSPSetApplicationContext(KSP, void *);
 PETSC_EXTERN PetscErrorCode KSPGetApplicationContext(KSP, void *);
-PETSC_EXTERN PetscErrorCode KSPSetComputeRHS(KSP, PetscErrorCode (*func)(KSP, Vec, void *), void *);
-PETSC_EXTERN PetscErrorCode KSPSetComputeOperators(KSP, PetscErrorCode (*)(KSP, Mat, Mat, void *), void *);
-PETSC_EXTERN PetscErrorCode KSPSetComputeInitialGuess(KSP, PetscErrorCode (*)(KSP, Vec, void *), void *);
-PETSC_EXTERN PetscErrorCode DMKSPSetComputeOperators(DM, PetscErrorCode (*)(KSP, Mat, Mat, void *), void *);
-PETSC_EXTERN PetscErrorCode DMKSPGetComputeOperators(DM, PetscErrorCode (**)(KSP, Mat, Mat, void *), void *);
-PETSC_EXTERN PetscErrorCode DMKSPSetComputeRHS(DM, PetscErrorCode (*)(KSP, Vec, void *), void *);
-PETSC_EXTERN PetscErrorCode DMKSPGetComputeRHS(DM, PetscErrorCode (**)(KSP, Vec, void *), void *);
-PETSC_EXTERN PetscErrorCode DMKSPSetComputeInitialGuess(DM, PetscErrorCode (*)(KSP, Vec, void *), void *);
-PETSC_EXTERN PetscErrorCode DMKSPGetComputeInitialGuess(DM, PetscErrorCode (**)(KSP, Vec, void *), void *);
+
+/*S
+  KSPComputeRHSFn - A prototype of a `KSP` evaluation function that would be passed to `KSPSetComputeRHS()`
+
+  Calling Sequence:
++ ksp  - `ksp` context
+. b    - output vector
+- ctx - [optional] user-defined function context
+
+  Level: beginner
+
+.seealso: [](ch_snes), `KSP`, `KSPSetComputeRHS()`, `SNESGetFunction()`, `KSPComputeInitialGuessFn`, `KSPComputeOperatorsFn`
+S*/
+PETSC_EXTERN_TYPEDEF typedef PetscErrorCode(KSPComputeRHSFn)(KSP ksp, Vec b, void *ctx);
+
+PETSC_EXTERN PetscErrorCode KSPSetComputeRHS(KSP, KSPComputeRHSFn *, void *);
+
+/*S
+  KSPComputeOperatorsFn - A prototype of a `KSP` evaluation function that would be passed to `KSPSetComputeOperators()`
+
+  Calling Sequence:
++ ksp - `KSP` context
+. A   - the operator that defines the linear system
+. P   - an operator from which to build the preconditioner (often the same as `A`)
+- ctx - [optional] user-defined function context
+
+  Level: beginner
+
+.seealso: [](ch_snes), `KSP`, `KSPSetComputeRHS()`, `SNESGetFunction()`, `KSPComputeRHSFn`, `KSPComputeInitialGuessFn`
+S*/
+PETSC_EXTERN_TYPEDEF typedef PetscErrorCode(KSPComputeOperatorsFn)(KSP ksp, Mat A, Mat P, void *ctx);
+
+PETSC_EXTERN PetscErrorCode KSPSetComputeOperators(KSP, KSPComputeOperatorsFn, void *);
+
+/*S
+  KSPComputeInitialGuessFn - A prototype of a `KSP` evaluation function that would be passed to `KSPSetComputeInitialGuess()`
+
+  Calling Sequence:
++ ksp  - `ksp` context
+. x    - output vector
+- ctx - [optional] user-defined function context
+
+  Level: beginner
+
+.seealso: [](ch_snes), `KSP`, `KSPSetComputeInitialGuess()`, `SNESGetFunction()`, `KSPComputeRHSFn`, `KSPComputeOperatorsFn`
+S*/
+PETSC_EXTERN_TYPEDEF typedef PetscErrorCode(KSPComputeInitialGuessFn)(KSP ksp, Vec x, void *ctx);
+
+PETSC_EXTERN PetscErrorCode KSPSetComputeInitialGuess(KSP, KSPComputeInitialGuessFn *, void *);
+PETSC_EXTERN PetscErrorCode DMKSPSetComputeOperators(DM, KSPComputeOperatorsFn *, void *);
+PETSC_EXTERN PetscErrorCode DMKSPGetComputeOperators(DM, KSPComputeOperatorsFn **, void *);
+PETSC_EXTERN PetscErrorCode DMKSPSetComputeRHS(DM, KSPComputeRHSFn *, void *);
+PETSC_EXTERN PetscErrorCode DMKSPGetComputeRHS(DM, KSPComputeRHSFn **, void *);
+PETSC_EXTERN PetscErrorCode DMKSPSetComputeInitialGuess(DM, KSPComputeInitialGuessFn *, void *);
+PETSC_EXTERN PetscErrorCode DMKSPGetComputeInitialGuess(DM, KSPComputeInitialGuessFn **, void *);
 
 PETSC_EXTERN PetscErrorCode DMGlobalToLocalSolve(DM, Vec, Vec);
 PETSC_EXTERN PetscErrorCode DMProjectField(DM, PetscReal, Vec, void (**)(PetscInt, PetscInt, PetscInt, const PetscInt[], const PetscInt[], const PetscScalar[], const PetscScalar[], const PetscScalar[], const PetscInt[], const PetscInt[], const PetscScalar[], const PetscScalar[], const PetscScalar[], PetscReal, const PetscReal[], PetscInt, const PetscScalar[], PetscScalar[]), InsertMode, Vec);
-PETSC_EXTERN PetscErrorCode DMSwarmProjectFields(DM, PetscInt, const char **, Vec[], ScatterMode mode);
+PETSC_EXTERN PetscErrorCode DMSwarmProjectFields(DM, DM, PetscInt, const char **, Vec[], ScatterMode mode);
 
 PETSC_EXTERN PetscErrorCode DMAdaptInterpolator(DM, DM, Mat, KSP, Mat, Mat, Mat *, void *);
 PETSC_EXTERN PetscErrorCode DMCheckInterpolator(DM, Mat, Mat, Mat, PetscReal);

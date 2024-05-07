@@ -308,8 +308,8 @@ PetscErrorCode MatNullSpaceDestroy(MatNullSpace *sp)
 
   PetscFunctionBegin;
   if (!*sp) PetscFunctionReturn(PETSC_SUCCESS);
-  PetscValidHeaderSpecific((*sp), MAT_NULLSPACE_CLASSID, 1);
-  if (--((PetscObject)(*sp))->refct > 0) {
+  PetscValidHeaderSpecific(*sp, MAT_NULLSPACE_CLASSID, 1);
+  if (--((PetscObject)*sp)->refct > 0) {
     *sp = NULL;
     PetscFunctionReturn(PETSC_SUCCESS);
   }
@@ -412,33 +412,22 @@ PetscErrorCode MatNullSpaceTest(MatNullSpace sp, Mat mat, PetscBool *isNull)
     PetscCall(VecNorm(r, NORM_2, &nrm));
     if (nrm >= tol) consistent = PETSC_FALSE;
     if (flg1) {
-      if (consistent) {
-        PetscCall(PetscPrintf(PetscObjectComm((PetscObject)sp), "Constants are likely null vector"));
-      } else {
-        PetscCall(PetscPrintf(PetscObjectComm((PetscObject)sp), "Constants are unlikely null vector "));
-      }
-      PetscCall(PetscPrintf(PetscObjectComm((PetscObject)sp), "|| A * 1/N || = %g\n", (double)nrm));
+      PetscCall(PetscPrintf(PetscObjectComm((PetscObject)sp), "Constants are %s null vector ", consistent ? "likely" : "unlikely"));
+      PetscCall(PetscPrintf(PetscObjectComm((PetscObject)sp), "|| A * 1/sqrt(N) || = %g\n", (double)nrm));
     }
-    if (!consistent && flg1) PetscCall(VecView(r, viewer));
-    if (!consistent && flg2) PetscCall(VecView(r, viewer));
+    if (!consistent && (flg1 || flg2)) PetscCall(VecView(r, viewer));
     PetscCall(VecDestroy(&r));
   }
 
   for (j = 0; j < n; j++) {
-    PetscCall((*mat->ops->mult)(mat, sp->vecs[j], l));
+    PetscUseTypeMethod(mat, mult, sp->vecs[j], l);
     PetscCall(VecNorm(l, NORM_2, &nrm));
     if (nrm >= tol) consistent = PETSC_FALSE;
     if (flg1) {
-      if (consistent) {
-        PetscCall(PetscPrintf(PetscObjectComm((PetscObject)sp), "Null vector %" PetscInt_FMT " is likely null vector", j));
-      } else {
-        PetscCall(PetscPrintf(PetscObjectComm((PetscObject)sp), "Null vector %" PetscInt_FMT " unlikely null vector ", j));
-        consistent = PETSC_FALSE;
-      }
+      PetscCall(PetscPrintf(PetscObjectComm((PetscObject)sp), "Null vector %" PetscInt_FMT " is %s null vector ", j, consistent ? "likely" : "unlikely"));
       PetscCall(PetscPrintf(PetscObjectComm((PetscObject)sp), "|| A * v[%" PetscInt_FMT "] || = %g\n", j, (double)nrm));
     }
-    if (!consistent && flg1) PetscCall(VecView(l, viewer));
-    if (!consistent && flg2) PetscCall(VecView(l, viewer));
+    if (!consistent && (flg1 || flg2)) PetscCall(VecView(l, viewer));
   }
 
   PetscCheck(!sp->remove, PetscObjectComm((PetscObject)mat), PETSC_ERR_SUP, "Cannot test a null space provided as a function with MatNullSpaceSetFunction()");

@@ -92,7 +92,7 @@ int main(int argc, char **argv)
     }
     PetscCall(PetscSectionSetUp(s));
     PetscCall(DMGetPointSF(dm, &sf));
-    PetscCall(PetscSectionCreateGlobalSection(s, sf, PETSC_FALSE, PETSC_FALSE, &gsection));
+    PetscCall(PetscSectionCreateGlobalSection(s, sf, PETSC_TRUE, PETSC_FALSE, PETSC_FALSE, &gsection));
     PetscCall(PetscSectionGetStorageSize(gsection, &gSizeBefore));
     minBefore = gSizeBefore;
     maxBefore = gSizeBefore;
@@ -105,7 +105,7 @@ int main(int argc, char **argv)
   PetscCall(DMPlexRebalanceSharedPoints(dm, user.entityDepth, user.useInitialGuess, user.parallel, &success));
 
   if (size > 1) {
-    PetscCall(PetscSectionCreateGlobalSection(s, sf, PETSC_FALSE, PETSC_FALSE, &gsection));
+    PetscCall(PetscSectionCreateGlobalSection(s, sf, PETSC_TRUE, PETSC_FALSE, PETSC_FALSE, &gsection));
     PetscCall(PetscSectionGetStorageSize(gsection, &gSizeAfter));
     minAfter = gSizeAfter;
     maxAfter = gSizeAfter;
@@ -133,14 +133,14 @@ int main(int argc, char **argv)
       suffix: 0
       nsize: {{2 3 4}}
       requires: parmetis
-      args: -dm_plex_box_faces {{2,3,4  5,4,3  7,11,5}} -entity_depth {{0 1}} -parallel {{FALSE TRUE}} -use_initial_guess FALSE
+      args: -dm_plex_box_faces {{2,3,4 5,4,3 7,11,5}} -entity_depth {{0 1}} -parallel {{FALSE TRUE}} -use_initial_guess FALSE
 
     test:
       # rebalance a mesh but use the initial guess (uses a random algorithm and gives different results on different machines, so just check that it runs).
       suffix: 1
       nsize: {{2 3 4}}
       requires: parmetis
-      args: -dm_plex_box_faces {{2,3,4  5,4,3  7,11,5}} -entity_depth {{0 1}} -parallel TRUE -use_initial_guess TRUE
+      args: -dm_plex_box_faces {{2,3,4 5,4,3 7,11,5}} -entity_depth {{0 1}} -parallel TRUE -use_initial_guess TRUE
 
     test:
       # no-op in serial

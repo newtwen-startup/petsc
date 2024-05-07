@@ -26,7 +26,7 @@ static inline PetscReal DMatrix_Determinant_3x3_Internal(const PetscReal inmat[3
   return inmat[0] * (inmat[8] * inmat[4] - inmat[7] * inmat[5]) - inmat[3] * (inmat[8] * inmat[1] - inmat[7] * inmat[2]) + inmat[6] * (inmat[5] * inmat[1] - inmat[4] * inmat[2]);
 }
 
-static inline PetscErrorCode DMatrix_Invert_3x3_Internal(const PetscReal *inmat, PetscReal *outmat, PetscScalar *determinant)
+static inline PetscErrorCode DMatrix_Invert_3x3_Internal(const PetscReal *inmat, PetscReal *outmat, PetscReal *determinant)
 {
   PetscReal det = DMatrix_Determinant_3x3_Internal(inmat);
   if (outmat) {
@@ -274,8 +274,8 @@ static PetscErrorCode Compute_Lagrange_Basis_2D_Internal(const PetscInt nverts, 
             if (dphidx) dphidx[i + offset] += dNi_dxi[i] * ijacobian[k * 2 + 0];
             if (dphidy) dphidy[i + offset] += dNi_deta[i] * ijacobian[k * 2 + 1];
           } /* for k=[0..2) */
-        }   /* for i=[0..nverts) */
-      }     /* if (dphidx) */
+        } /* for i=[0..nverts) */
+      } /* if (dphidx) */
     }
   } else if (nverts == 3) { /* Linear triangle */
     const PetscReal x2 = coords[2 * 3 + 0], y2 = coords[2 * 3 + 1];
@@ -500,7 +500,7 @@ static PetscErrorCode Compute_Lagrange_Basis_3D_Internal(const PetscInt nverts, 
 
       if (phypts) {
         for (i = 0; i < nverts; ++i) {
-          const PetscScalar *vertices = coords + i * 3;
+          const PetscReal *vertices = coords + i * 3;
           phypts[3 * j + 0] += phi[i + offset] * vertices[0];
           phypts[3 * j + 1] += phi[i + offset] * vertices[1];
           phypts[3 * j + 2] += phi[i + offset] * vertices[2];

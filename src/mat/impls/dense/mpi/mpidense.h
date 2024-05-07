@@ -38,7 +38,7 @@ typedef struct {
   /* The following variables are used for matrix-vector products */
   Vec       lvec;        /* local vector */
   PetscSF   Mvctx;       /* for mat-mult communications */
-  PetscBool roworiented; /* if true, row oriented input (default) */
+  PetscBool roworiented; /* if true, row-oriented input (default) */
 
   /* Support for MatDenseGetColumnVec and MatDenseGetSubMatrix */
   Mat                cmat;     /* matrix representation of a given subset of columns */
@@ -53,7 +53,6 @@ PETSC_INTERN PetscErrorCode MatCreateSubMatrices_MPIDense(Mat, PetscInt, const I
 PETSC_INTERN PetscErrorCode MatProductSetFromOptions_MPIAIJ_MPIDense(Mat);
 
 PETSC_INTERN PetscErrorCode MatProductSetFromOptions_MPIDense_MPIAIJ(Mat);
-PETSC_INTERN PetscErrorCode MatProductSetFromOptions_MPIDense(Mat);
 
 #if defined(PETSC_HAVE_ELEMENTAL)
 PETSC_INTERN PetscErrorCode MatMatMultSymbolic_Elemental(Mat, Mat, PetscReal, Mat);

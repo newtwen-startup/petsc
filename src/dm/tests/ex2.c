@@ -7,12 +7,12 @@ static char help[] = "Tests various 1-dimensional DMDA routines.\n\n";
 int main(int argc, char **argv)
 {
   PetscMPIInt            rank;
-  PetscInt               M = 13, s = 1, dof = 1;
+  PetscInt               M = 13, s = 1, dof = 1, n;
   DMBoundaryType         bx = DM_BOUNDARY_PERIODIC;
   DM                     da;
   PetscViewer            viewer;
   Vec                    local, global;
-  PetscScalar            value;
+  PetscScalar            value, *array;
   PetscDraw              draw;
   PetscBool              flg = PETSC_FALSE;
   ISLocalToGlobalMapping is;
@@ -42,7 +42,10 @@ int main(int argc, char **argv)
 
   PetscCallMPI(MPI_Comm_rank(PETSC_COMM_WORLD, &rank));
   value = rank + 1;
-  PetscCall(VecScale(global, value));
+  PetscCall(VecGetLocalSize(global, &n));
+  PetscCall(VecGetArray(global, &array));
+  for (PetscInt i = 0; i < n; i++) array[i] *= value;
+  PetscCall(VecRestoreArray(global, &array));
 
   PetscCall(VecView(global, viewer));
   PetscCall(PetscViewerASCIIPrintf(PETSC_VIEWER_STDOUT_WORLD, "\nGlobal Vector:\n"));
@@ -58,11 +61,10 @@ int main(int argc, char **argv)
     PetscViewer sviewer;
 
     PetscCall(PetscViewerASCIIPushSynchronized(PETSC_VIEWER_STDOUT_WORLD));
-    PetscCall(PetscViewerASCIISynchronizedPrintf(PETSC_VIEWER_STDOUT_WORLD, "\nLocal Vector: processor %d\n", rank));
     PetscCall(PetscViewerGetSubViewer(PETSC_VIEWER_STDOUT_WORLD, PETSC_COMM_SELF, &sviewer));
+    PetscCall(PetscViewerASCIIPrintf(sviewer, "\nLocal Vector: processor %d\n", rank));
     PetscCall(VecView(local, sviewer));
     PetscCall(PetscViewerRestoreSubViewer(PETSC_VIEWER_STDOUT_WORLD, PETSC_COMM_SELF, &sviewer));
-    PetscCall(PetscViewerFlush(PETSC_VIEWER_STDOUT_WORLD));
     PetscCall(PetscViewerASCIIPopSynchronized(PETSC_VIEWER_STDOUT_WORLD));
   }
   PetscCall(PetscViewerASCIIPrintf(PETSC_VIEWER_STDOUT_WORLD, "\nLocal to global mapping\n"));

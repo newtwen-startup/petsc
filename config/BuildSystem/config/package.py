@@ -48,6 +48,7 @@ class Package(config.base.Configure):
     self.foundversion     = ''   # version of the package actually found
     self.version_tuple    = ''   # version of the package actually found (tuple)
     self.requiresversion  = 0    # error if the version information is not found
+    self.requirekandr     = 0    # package requires KandR compiler flags to build
 
     # These are specified for the package
     self.required               = 0    # 1 means the package is required
@@ -407,11 +408,8 @@ class Package(config.base.Configure):
     outflags = self.removeVisibilityFlag(flags.split())
     outflags = self.removeWarningFlags(outflags)
     outflags = self.removeCoverageFlag(outflags)
-    with self.Language('C'):
-      if config.setCompilers.Configure.isClang(self.getCompiler(), self.log):
-        outflags.append('-Wno-implicit-function-declaration')
-        if config.setCompilers.Configure.isDarwin(self.log):
-          outflags.append('-fno-common')
+    if self.requirekandr:
+      outflags += self.setCompilers.KandRFlags
     return ' '.join(outflags)
 
   def updatePackageFFlags(self,flags):
@@ -554,17 +552,21 @@ Now rerun configure''' % (self.installDirProvider.dir, '--download-'+self.packag
     alllibs = []
     if not directory:  # compiler default path - so also check compiler default libs.
       alllibs.insert(0,[])
+    elif directory in self.libraries.sysDirs:
+      self.logPrint('generateLibList: systemDir detected! skipping: '+str(directory))
+      directory = ''
     for libSet in liblist:
       libs = []
-      # add full path only to the first library in the list
-      if len(libSet) > 0:
-        libs.append(os.path.join(directory, libSet[0]))
-      for library in libSet[1:]:
-        # if the library name doesn't start with lib - then add the fullpath
+      use_L = 0
+      for library in libSet:
+        # if the library name starts with 'lib' or uses '-lfoo' then add in -Lpath. Otherwise - add the fullpath
         if library.startswith('-l') or library.startswith('lib'):
           libs.append(library)
+          use_L = 1
         else:
           libs.append(os.path.join(directory, library))
+      if use_L and directory:
+        libs.insert(0,'-L'+directory)
       libs.extend(self.extraLib)
       alllibs.append(libs)
     return alllibs
@@ -611,7 +613,7 @@ Now rerun configure''' % (self.installDirProvider.dir, '--download-'+self.packag
       if self.argDB['with-'+self.package+'-pkg-config']:
         if path: os.environ['PKG_CONFIG_PATH'] = path
         else: os.environ['PKG_CONFIG_PATH'] = ''
-      yield('pkg-config located libraries and includes '+self.PACKAGE, None, l, i)
+      yield('pkg-config located libraries and includes '+self.PACKAGE, None, l.split(), i)
       raise RuntimeError('pkg-config could not locate correct includes and libraries for '+self.package)
 
 
@@ -1222,7 +1224,7 @@ To use currently downloaded (local) git snapshot - use: --download-'+self.packag
 {x}
 #define  PetscXstr_(s) PetscStr_(s)
 #define  PetscStr_(s)  #s
-char     *ver = "petscpkgver(" PetscXstr_({y}) ")";
+const char *ver = "petscpkgver(" PetscXstr_({y}) ")";
 '''.format(x=includeLines, y=self.versionname))
        # Ex. char *ver = "petscpkgver(" "20211206" ")";
        # But after stripping spaces, quotes etc below, it becomes char*ver=petscpkgver(20211206);
@@ -1236,20 +1238,18 @@ char     *ver = "petscpkgver(" PetscXstr_({y}) ")";
       return
     self.popLanguage()
     setattr(self.compilers, flagsArg,oldFlags)
-    #strip #lines
-    output = re.sub('#.*\n','\n',output)
-    #strip newlines,spaces,quotes
-    output = re.sub('[\n "]*','',output)
-    #strip backslash. Mumps' version macro already has "" around it, giving output: char *ver = petscpkgver(" "\"5.4.1\"" ")";
-    output = output.replace('\\','')
-    #now split over ';'
-    loutput = output.split(';')
+    # the preprocessor output might be very long, but the petscpkgver line should be at the end. Therefore, we partition it backwards
+    [mid, right] = output.rpartition('petscpkgver')[1:]
     version = ''
-    for i in loutput:
-      if i.find('petscpkgver') >=0:
-        self.log.write('Found version string: ' + i +'\n')
-        version = i.split('(')[1].split(')')[0]
-        break
+    if mid: # if mid is not empty, then it should be 'petscpkgver', meaning we found the version string
+      verLine = right.split(';',1)[0] # get the string before the first ';'. Preprocessor might dump multiline result.
+      self.log.write('Found the raw version string: ' + verLine +'\n')
+      # strip backslashes, spaces, and quotes. Note MUMPS' version macro has "" around it, giving output: (" "\"5.4.1\"" ")";
+      for char in ['\\', ' ', '"']:
+          verLine = verLine.replace(char, '')
+      # get the string between the outer ()
+      version = verLine.split('(', 1)[-1].rsplit(')',1)[0]
+      self.log.write('This is the processed version string: ' + version +'\n')
     if not version:
       self.log.write('For '+self.package+' unable to find version information: output below, skipping version check\n')
       self.log.write(output)
@@ -1601,7 +1601,7 @@ Brief overview of how BuildSystem\'s configuration of packages works.
             self.includeDir   /* subdir of self.installDir */
             self.libDir       /* subdir of self.installDir, defined as self.installDir + self.libDirs[0] */
             self.confDir      /* where packages private to the configure/build process are built, such as --download-make */
-                              /* The subdirectory of this 'conf' is where where the configuration information will be stored for the package */
+                              /* The subdirectory of this 'conf' is where the configuration information will be stored for the package */
             self.packageDir = /* this dir is where the source is unpacked and built */
             self.getDir():
               ...
@@ -1980,8 +1980,10 @@ class CMakePackage(Package):
 
     if not config.setCompilers.Configure.isWindows(self.setCompilers.CC, self.log) and self.checkSharedLibrariesEnabled():
       args.append('-DBUILD_SHARED_LIBS:BOOL=ON')
+      args.append('-DBUILD_STATIC_LIBS:BOOL=OFF')
     else:
       args.append('-DBUILD_SHARED_LIBS:BOOL=OFF')
+      args.append('-DBUILD_STATIC_LIBS:BOOL=ON')
 
     if 'MSYSTEM' in os.environ:
       args.append('-G "MSYS Makefiles"')

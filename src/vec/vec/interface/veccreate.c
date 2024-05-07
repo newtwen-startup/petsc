@@ -1,4 +1,5 @@
 #include <petsc/private/vecimpl.h> /*I  "petscvec.h"   I*/
+#include <../src/vec/vec/impls/mpi/pvecimpl.h>
 
 static PetscErrorCode VecCreate_Common_Private(Vec v)
 {
@@ -14,7 +15,6 @@ static PetscErrorCode VecCreate_Common_Private(Vec v)
   v->boundtocpu = PETSC_TRUE;
 #endif
   PetscCall(PetscStrallocpy(PETSCRANDER48, &v->defaultrandtype));
-
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 

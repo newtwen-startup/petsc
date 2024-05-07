@@ -27,7 +27,6 @@ PetscErrorCode TaoBNCGEstimateActiveSet(Tao tao, PetscInt asType)
     PetscCall(ISDestroy(&cg->active_idx));
     PetscCall(ISComplementVec(cg->inactive_idx, tao->solution, &cg->active_idx));
     break;
-
   case CG_AS_BERTSEKAS:
     /* Use gradient descent to estimate the active set */
     PetscCall(VecCopy(cg->unprojected_gradient, cg->W));
@@ -47,13 +46,11 @@ PetscErrorCode TaoBNCGBoundStep(Tao tao, PetscInt asType, Vec step)
   PetscFunctionBegin;
   switch (asType) {
   case CG_AS_NONE:
-    PetscCall(VecISSet(step, cg->active_idx, 0.0));
+    if (cg->active_idx) PetscCall(VecISSet(step, cg->active_idx, 0.0));
     break;
-
   case CG_AS_BERTSEKAS:
     PetscCall(TaoBoundStep(tao->solution, tao->XL, tao->XU, cg->active_lower, cg->active_upper, cg->active_fixed, 1.0, step));
     break;
-
   default:
     break;
   }
@@ -83,7 +80,7 @@ static PetscErrorCode TaoSolve_BNCG(Tao tao)
 
   /* Project the gradient and calculate the norm */
   PetscCall(VecCopy(cg->unprojected_gradient, tao->gradient));
-  PetscCall(VecISSet(tao->gradient, cg->active_idx, 0.0));
+  if (cg->active_idx) PetscCall(VecISSet(tao->gradient, cg->active_idx, 0.0));
   PetscCall(VecNorm(tao->gradient, NORM_2, &gnorm));
   gnorm2 = gnorm * gnorm;
 
@@ -443,8 +440,8 @@ PETSC_INTERN PetscErrorCode TaoBNCGStepDirectionUpdate(Tao tao, PetscReal gnorm2
   PetscReal gkp1_yk, gd_old, tau_bfgs, tau_dfp, gkp1D_yk, gtDg;
   PetscInt  dim;
   PetscBool cg_restart = PETSC_FALSE;
-  PetscFunctionBegin;
 
+  PetscFunctionBegin;
   /* Local curvature check to see if we need to restart */
   if (tao->niter >= 1 || tao->recycle) {
     PetscCall(VecWAXPY(cg->yk, -1.0, cg->G_old, tao->gradient));
@@ -968,7 +965,7 @@ PETSC_INTERN PetscErrorCode TaoBNCGConductIteration(Tao tao, PetscReal gnorm)
   PetscCall(TaoBNCGEstimateActiveSet(tao, cg->as_type));
   /* Compute the projected gradient and its norm */
   PetscCall(VecCopy(cg->unprojected_gradient, tao->gradient));
-  PetscCall(VecISSet(tao->gradient, cg->active_idx, 0.0));
+  if (cg->active_idx) PetscCall(VecISSet(tao->gradient, cg->active_idx, 0.0));
   PetscCall(VecNorm(tao->gradient, NORM_2, &gnorm));
   gnorm2 = gnorm * gnorm;
 

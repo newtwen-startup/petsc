@@ -283,7 +283,8 @@ PetscErrorCode PetscOptionsDestroyDefault(void)
 @*/
 PetscErrorCode PetscOptionsValidKey(const char key[], PetscBool *valid)
 {
-  char *ptr;
+  char               *ptr;
+  PETSC_UNUSED double d;
 
   PetscFunctionBegin;
   if (key) PetscAssertPointer(key, 1);
@@ -293,7 +294,7 @@ PetscErrorCode PetscOptionsValidKey(const char key[], PetscBool *valid)
   if (key[0] != '-') PetscFunctionReturn(PETSC_SUCCESS);
   if (key[1] == '-') key++;
   if (!isalpha((int)key[1])) PetscFunctionReturn(PETSC_SUCCESS);
-  (void)strtod(key, &ptr);
+  d = strtod(key, &ptr);
   if (ptr != key && !(*ptr == '_' || isalnum((int)*ptr))) PetscFunctionReturn(PETSC_SUCCESS);
   *valid = PETSC_TRUE;
   PetscFunctionReturn(PETSC_SUCCESS);
@@ -1048,9 +1049,9 @@ PETSC_EXTERN PetscErrorCode PetscOptionsViewError(void)
 
   Notes:
   It is common to use this in conjunction with `-options_file` as in
-
-$ -prefix_push system1_ -options_file system1rc -prefix_pop -prefix_push system2_ -options_file system2rc -prefix_pop
-
+.vb
+ -prefix_push system1_ -options_file system1rc -prefix_pop -prefix_push system2_ -options_file system2rc -prefix_pop
+.ve
   where the files no longer require all options to be prefixed with `-system2_`.
 
   The collectivity of this routine is complex; only the MPI processes that call this routine will
@@ -1070,7 +1071,7 @@ PetscErrorCode PetscOptionsPrefixPush(PetscOptions options, const char prefix[])
   PetscFunctionBegin;
   PetscAssertPointer(prefix, 2);
   options = options ? options : defaultoptions;
-  PetscCheck(options->prefixind < MAXPREFIXES, PETSC_COMM_SELF, PETSC_ERR_PLIB, "Maximum depth of prefix stack %d exceeded, recompile \n src/sys/objects/options.c with larger value for MAXPREFIXES", MAXPREFIXES);
+  PetscCheck(options->prefixind < MAXPREFIXES, PETSC_COMM_SELF, PETSC_ERR_PLIB, "Maximum depth of prefix stack %d exceeded, recompile src/sys/objects/options.c with larger value for MAXPREFIXES", MAXPREFIXES);
   key[0] = '-'; /* keys must start with '-' */
   PetscCall(PetscStrncpy(key + 1, prefix, sizeof(key) - 1));
   PetscCall(PetscOptionsValidKey(key, &valid));
@@ -1596,7 +1597,7 @@ PetscErrorCode PetscOptionsFindPair(PetscOptions options, const char pre[], cons
 }
 
 /* Check whether any option begins with pre+name */
-PETSC_EXTERN PetscErrorCode PetscOptionsFindPairPrefix_Private(PetscOptions options, const char pre[], const char name[], const char *value[], PetscBool *set)
+PETSC_EXTERN PetscErrorCode PetscOptionsFindPairPrefix_Private(PetscOptions options, const char pre[], const char name[], const char *option[], const char *value[], PetscBool *set)
 {
   char buf[PETSC_MAX_OPTION_NAME];
   int  numCnt = 0, locs[16], loce[16];
@@ -1664,6 +1665,7 @@ PETSC_EXTERN PetscErrorCode PetscOptionsFindPairPrefix_Private(PetscOptions opti
       PetscCall(PetscStrncmp(options->names[i], opt, len, &match));
       if (match) {
         options->used[i] = PETSC_TRUE;
+        if (option) *option = options->names[i];
         if (value) *value = options->values[i];
         if (set) *set = PETSC_TRUE;
         PetscFunctionReturn(PETSC_SUCCESS);
@@ -2059,7 +2061,7 @@ PetscErrorCode PetscOptionsLeftRestore(PetscOptions options, PetscInt *N, char *
 
   Notes:
   If ctx is `NULL`, `PetscPrintf()` is used.
-  The first MPI rank in the `PetscViewer` viewer actually prints the values, other
+  The first MPI process in the `PetscViewer` viewer actually prints the values, other
   processes may have different values set
 
   If `PetscCIEnabled` then do not print the test harness options
@@ -2373,11 +2375,11 @@ PetscErrorCode PetscOptionsStringToScalar(const char name[], PetscScalar *a)
   TRUE, true, YES, yes, nostring, and 1 all translate to `PETSC_TRUE`
   FALSE, false, NO, no, and 0 all translate to `PETSC_FALSE`
 
-  If the option is given, but no value is provided, then ivalue and set are both given the value `PETSC_TRUE`. That is -requested_bool
-  is equivalent to -requested_bool true
+  If the option is given, but no value is provided, then `ivalue` and `set` are both given the value `PETSC_TRUE`. That is `-requested_bool`
+  is equivalent to `-requested_bool true`
 
-  If the user does not supply the option at all ivalue is NOT changed. Thus
-  you should ALWAYS initialize the ivalue if you access it without first checking if the set flag is true.
+  If the user does not supply the option at all `ivalue` is NOT changed. Thus
+  you should ALWAYS initialize `ivalue` if you access it without first checking that the `set` flag is true.
 
 .seealso: `PetscOptionsGetReal()`, `PetscOptionsHasName()`, `PetscOptionsGetString()`,
           `PetscOptionsGetIntArray()`, `PetscOptionsGetRealArray()`, `PetscOptionsGetInt()`, `PetscOptionsBool()`,
@@ -2424,8 +2426,8 @@ PetscErrorCode PetscOptionsGetBool(PetscOptions options, const char pre[], const
   Level: intermediate
 
   Notes:
-  If the user does not supply the option value is NOT changed. Thus
-  you should ALWAYS initialize the ivalue if you access it without first checking if the set flag is true.
+  If the user does not supply the option `value` is NOT changed. Thus
+  you should ALWAYS initialize `value` if you access it without first checking that the `set` flag is true.
 
   See `PetscOptionsFList()` for when the choices are given in a `PetscFunctionList`
 
@@ -2485,16 +2487,16 @@ PetscErrorCode PetscOptionsGetEList(PetscOptions options, const char pre[], cons
 - list    - array containing the list of choices, followed by the enum name, followed by the enum prefix, followed by a null
 
   Output Parameters:
-+ value - the  value to return
++ value - the value to return
 - set   - `PETSC_TRUE` if found, else `PETSC_FALSE`
 
   Level: beginner
 
   Notes:
-  If the user does not supply the option value is NOT changed. Thus
-  you should ALWAYS initialize the ivalue if you access it without first checking if the set flag is true.
+  If the user does not supply the option `value` is NOT changed. Thus
+  you should ALWAYS initialize `value` if you access it without first checking that the `set` flag is true.
 
-  List is usually something like `PCASMTypes` or some other predefined list of enum names
+  `list` is usually something like `PCASMTypes` or some other predefined list of enum names
 
 .seealso: `PetscOptionsGetReal()`, `PetscOptionsHasName()`, `PetscOptionsGetString()`, `PetscOptionsGetInt()`,
           `PetscOptionsGetIntArray()`, `PetscOptionsGetRealArray()`, `PetscOptionsBool()`
@@ -2538,8 +2540,8 @@ PetscErrorCode PetscOptionsGetEnum(PetscOptions options, const char pre[], const
   Level: beginner
 
   Notes:
-  If the user does not supply the option ivalue is NOT changed. Thus
-  you should ALWAYS initialize the ivalue if you access it without first checking if the set flag is true.
+  If the user does not supply the option `ivalue` is NOT changed. Thus
+  you should ALWAYS initialize the `ivalue` if you access it without first checking that the `set` flag is true.
 
 .seealso: `PetscOptionsGetReal()`, `PetscOptionsHasName()`, `PetscOptionsGetString()`,
           `PetscOptionsGetIntArray()`, `PetscOptionsGetRealArray()`, `PetscOptionsBool()`
@@ -2589,8 +2591,8 @@ PetscErrorCode PetscOptionsGetInt(PetscOptions options, const char pre[], const 
   Level: beginner
 
   Note:
-  If the user does not supply the option dvalue is NOT changed. Thus
-  you should ALWAYS initialize the ivalue if you access it without first checking if the set flag is true.
+  If the user does not supply the option `dvalue` is NOT changed. Thus
+  you should ALWAYS initialize `dvalue` if you access it without first checking that the `set` flag is true.
 
 .seealso: `PetscOptionsGetInt()`, `PetscOptionsHasName()`,
           `PetscOptionsGetString()`, `PetscOptionsGetIntArray()`, `PetscOptionsGetRealArray()`, `PetscOptionsBool()`,
@@ -2633,7 +2635,7 @@ PetscErrorCode PetscOptionsGetReal(PetscOptions options, const char pre[], const
 - name    - the option one is seeking
 
   Output Parameters:
-+ dvalue - the double value to return
++ dvalue - the scalar value to return
 - set    - `PETSC_TRUE` if found, else `PETSC_FALSE`
 
   Level: beginner
@@ -2642,8 +2644,8 @@ PetscErrorCode PetscOptionsGetReal(PetscOptions options, const char pre[], const
   A complex number 2+3i must be specified with NO spaces
 
   Note:
-  If the user does not supply the option dvalue is NOT changed. Thus
-  you should ALWAYS initialize the ivalue if you access it without first checking if the set flag is true.
+  If the user does not supply the option `dvalue` is NOT changed. Thus
+  you should ALWAYS initialize `dvalue` if you access it without first checking if the `set` flag is true.
 
 .seealso: `PetscOptionsGetInt()`, `PetscOptionsHasName()`,
           `PetscOptionsGetString()`, `PetscOptionsGetIntArray()`, `PetscOptionsGetRealArray()`, `PetscOptionsBool()`,
@@ -2697,12 +2699,10 @@ PetscErrorCode PetscOptionsGetScalar(PetscOptions options, const char pre[], con
   Level: beginner
 
   Note:
-  if the option is given but no string is provided then an empty string is returned and set is given the value of `PETSC_TRUE`
+  if the option is given but no string is provided then an empty string is returned and `set` is given the value of `PETSC_TRUE`
 
-  If the user does not use the option then the string is not changed. Thus
-  you should ALWAYS initialize the string if you access it without first checking if the set flag is true.
-
-  Even if the user provided no string (for example -optionname -someotheroption) the flag is set to PETSC_TRUE (and the string is fulled with nulls).
+  If the user does not use the option then `string` is not changed. Thus
+  you should ALWAYS initialize `string` if you access it without first checking that the `set` flag is true.
 
   Fortran Notes:
   The Fortran interface is slightly different from the C/C++
@@ -2752,7 +2752,7 @@ PetscErrorCode PetscOptionsGetString(PetscOptions options, const char pre[], con
 - name    - the option one is seeking
 
   Output Parameters:
-+ dvalue - the integer values to return
++ dvalue - the Boolean values to return
 . nmax   - On input maximum number of values to retrieve, on output the actual number of values retrieved
 - set    - `PETSC_TRUE` if found, else `PETSC_FALSE`
 
@@ -2820,11 +2820,9 @@ PetscErrorCode PetscOptionsGetBoolArray(PetscOptions options, const char pre[], 
   Level: beginner
 
   Notes:
-  The array must be passed as a comma separated list.
+  The array must be passed as a comma separated list with no spaces between the items.
 
-  There must be no intervening spaces between the values.
-
-  list is usually something like `PCASMTypes` or some other predefined list of enum names.
+  `list` is usually something like `PCASMTypes` or some other predefined list of enum names.
 
 .seealso: `PetscOptionsGetReal()`, `PetscOptionsHasName()`, `PetscOptionsGetString()`, `PetscOptionsGetInt()`,
           `PetscOptionsGetEnum()`, `PetscOptionsGetIntArray()`, `PetscOptionsGetRealArray()`, `PetscOptionsBool()`
@@ -3105,7 +3103,7 @@ PetscErrorCode PetscOptionsGetScalarArray(PetscOptions options, const char pre[]
   Level: beginner
 
   Notes:
-  The nmax parameter is used for both input and output.
+  The `nmax` parameter is used for both input and output.
 
   The user should pass in an array of pointers to char, to hold all the
   strings returned by this function.

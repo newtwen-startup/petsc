@@ -25,17 +25,16 @@
 
   Notes:
   When using mode = `INSERT_VALUES`, this method will reset the number of particles in the `DMSWARM`
-  to be npoints[0]*npoints[1] (2D) or npoints[0]*npoints[1]*npoints[2] (3D). When using mode = `ADD_VALUES`,
+  to be `npoints[0]` x `npoints[1]` (2D) or `npoints[0]` x `npoints[1]` x `npoints[2]` (3D). When using mode = `ADD_VALUES`,
   new points will be appended to any already existing in the `DMSWARM`
 
 .seealso: `DM`, `DMSWARM`, `DMSwarmSetType()`, `DMSwarmSetCellDM()`, `DMSwarmType`
 @*/
 PETSC_EXTERN PetscErrorCode DMSwarmSetPointsUniformCoordinates(DM dm, PetscReal min[], PetscReal max[], PetscInt npoints[], InsertMode mode)
 {
-  PetscReal          gmin[] = {PETSC_MAX_REAL, PETSC_MAX_REAL, PETSC_MAX_REAL};
-  PetscReal          gmax[] = {PETSC_MIN_REAL, PETSC_MIN_REAL, PETSC_MIN_REAL};
-  PetscInt           i, j, k, N, bs, b, n_estimate, n_curr, n_new_est, p, n_found;
-  Vec                coorlocal;
+  PetscReal          lmin[] = {PETSC_MAX_REAL, PETSC_MAX_REAL, PETSC_MAX_REAL};
+  PetscReal          lmax[] = {PETSC_MIN_REAL, PETSC_MIN_REAL, PETSC_MIN_REAL};
+  PetscInt           i, j, k, bs, b, n_estimate, n_curr, n_new_est, p, n_found;
   const PetscScalar *_coor;
   DM                 celldm;
   PetscReal          dx[3];
@@ -50,18 +49,8 @@ PETSC_EXTERN PetscErrorCode DMSwarmSetPointsUniformCoordinates(DM dm, PetscReal 
   PetscFunctionBegin;
   DMSWARMPICVALID(dm);
   PetscCall(DMSwarmGetCellDM(dm, &celldm));
-  PetscCall(DMGetCoordinatesLocal(celldm, &coorlocal));
-  PetscCall(VecGetSize(coorlocal, &N));
-  PetscCall(VecGetBlockSize(coorlocal, &bs));
-  N = N / bs;
-  PetscCall(VecGetArrayRead(coorlocal, &_coor));
-  for (i = 0; i < N; i++) {
-    for (b = 0; b < bs; b++) {
-      gmin[b] = PetscMin(gmin[b], PetscRealPart(_coor[bs * i + b]));
-      gmax[b] = PetscMax(gmax[b], PetscRealPart(_coor[bs * i + b]));
-    }
-  }
-  PetscCall(VecRestoreArrayRead(coorlocal, &_coor));
+  PetscCall(DMGetLocalBoundingBox(celldm, lmin, lmax));
+  PetscCall(DMGetCoordinateDim(celldm, &bs));
 
   for (b = 0; b < bs; b++) {
     if (npoints[b] > 1) {
@@ -86,8 +75,8 @@ PETSC_EXTERN PetscErrorCode DMSwarmSetPointsUniformCoordinates(DM dm, PetscReal 
         ijk[2] = k;
         for (b = 0; b < bs; b++) xp[b] = min[b] + ijk[b] * dx[b];
         for (b = 0; b < bs; b++) {
-          if (xp[b] < gmin[b]) point_inside = PETSC_FALSE;
-          if (xp[b] > gmax[b]) point_inside = PETSC_FALSE;
+          if (xp[b] < lmin[b]) point_inside = PETSC_FALSE;
+          if (xp[b] > lmax[b]) point_inside = PETSC_FALSE;
         }
         if (point_inside) n_estimate++;
       }
@@ -114,8 +103,8 @@ PETSC_EXTERN PetscErrorCode DMSwarmSetPointsUniformCoordinates(DM dm, PetscReal 
         ijk[2] = k;
         for (b = 0; b < bs; b++) xp[b] = min[b] + ijk[b] * dx[b];
         for (b = 0; b < bs; b++) {
-          if (xp[b] < gmin[b]) point_inside = PETSC_FALSE;
-          if (xp[b] > gmax[b]) point_inside = PETSC_FALSE;
+          if (xp[b] < lmin[b]) point_inside = PETSC_FALSE;
+          if (xp[b] > lmax[b]) point_inside = PETSC_FALSE;
         }
         if (point_inside) {
           for (b = 0; b < bs; b++) _pos[bs * n_estimate + b] = xp[b];
@@ -549,13 +538,13 @@ PetscErrorCode DMSwarmSetNumSpecies(DM sw, PetscInt Ns)
 . sw - the `DMSWARM`
 
   Output Parameter:
-. coordFunc - the function setting initial particle positions, or `NULL`
+. coordFunc - the function setting initial particle positions, or `NULL`, see `PetscSimplePointFn` for the calling sequence
 
   Level: intermediate
 
-.seealso: `DMSWARM`, `DMSwarmSetCoordinateFunction()`, `DMSwarmGetVelocityFunction()`, `DMSwarmInitializeCoordinates()`
+.seealso: `DMSWARM`, `DMSwarmSetCoordinateFunction()`, `DMSwarmGetVelocityFunction()`, `DMSwarmInitializeCoordinates()`, `PetscSimplePointFn`
 @*/
-PetscErrorCode DMSwarmGetCoordinateFunction(DM sw, PetscSimplePointFunc *coordFunc)
+PetscErrorCode DMSwarmGetCoordinateFunction(DM sw, PetscSimplePointFn **coordFunc)
 {
   DM_Swarm *swarm = (DM_Swarm *)sw->data;
 
@@ -573,13 +562,13 @@ PetscErrorCode DMSwarmGetCoordinateFunction(DM sw, PetscSimplePointFunc *coordFu
 
   Input Parameters:
 + sw        - the `DMSWARM`
-- coordFunc - the function setting initial particle positions
+- coordFunc - the function setting initial particle positions, see `PetscSimplePointFn` for the calling sequence
 
   Level: intermediate
 
-.seealso: `DMSWARM`, `DMSwarmGetCoordinateFunction()`, `DMSwarmSetVelocityFunction()`, `DMSwarmInitializeCoordinates()`
+.seealso: `DMSWARM`, `DMSwarmGetCoordinateFunction()`, `DMSwarmSetVelocityFunction()`, `DMSwarmInitializeCoordinates()`, `PetscSimplePointFn`
 @*/
-PetscErrorCode DMSwarmSetCoordinateFunction(DM sw, PetscSimplePointFunc coordFunc)
+PetscErrorCode DMSwarmSetCoordinateFunction(DM sw, PetscSimplePointFn *coordFunc)
 {
   DM_Swarm *swarm = (DM_Swarm *)sw->data;
 
@@ -599,13 +588,13 @@ PetscErrorCode DMSwarmSetCoordinateFunction(DM sw, PetscSimplePointFunc coordFun
 . sw - the `DMSWARM`
 
   Output Parameter:
-. velFunc - the function setting initial particle velocities, or `NULL`
+. velFunc - the function setting initial particle velocities, or `NULL`, see `PetscSimplePointFn` for the calling sequence
 
   Level: intermediate
 
-.seealso: `DMSWARM`, `DMSwarmSetVelocityFunction()`, `DMSwarmGetCoordinateFunction()`, `DMSwarmInitializeVelocities()`
+.seealso: `DMSWARM`, `DMSwarmSetVelocityFunction()`, `DMSwarmGetCoordinateFunction()`, `DMSwarmInitializeVelocities()`, `PetscSimplePointFn`
 @*/
-PetscErrorCode DMSwarmGetVelocityFunction(DM sw, PetscSimplePointFunc *velFunc)
+PetscErrorCode DMSwarmGetVelocityFunction(DM sw, PetscSimplePointFn **velFunc)
 {
   DM_Swarm *swarm = (DM_Swarm *)sw->data;
 
@@ -623,13 +612,13 @@ PetscErrorCode DMSwarmGetVelocityFunction(DM sw, PetscSimplePointFunc *velFunc)
 
   Input Parameters:
 + sw      - the `DMSWARM`
-- velFunc - the function setting initial particle velocities
+- velFunc - the function setting initial particle velocities, see `PetscSimplePointFn` for the calling sequence
 
   Level: intermediate
 
-.seealso: `DMSWARM`, `DMSwarmGetVelocityFunction()`, `DMSwarmSetCoordinateFunction()`, `DMSwarmInitializeVelocities()`
+.seealso: `DMSWARM`, `DMSwarmGetVelocityFunction()`, `DMSwarmSetCoordinateFunction()`, `DMSwarmInitializeVelocities()`, `PetscSimplePointFn`
 @*/
-PetscErrorCode DMSwarmSetVelocityFunction(DM sw, PetscSimplePointFunc velFunc)
+PetscErrorCode DMSwarmSetVelocityFunction(DM sw, PetscSimplePointFn *velFunc)
 {
   DM_Swarm *swarm = (DM_Swarm *)sw->data;
 
@@ -686,7 +675,7 @@ PetscErrorCode DMSwarmComputeLocalSize(DM sw, PetscInt N, PetscProbFunc density)
     const PetscInt cell = c + cStart;
     PetscReal      v0[3], J[9], invJ[9], detJ, detJp = 2. / (gmax[0] - gmin[0]), xr[3], den;
 
-    /*Have to transform quadrature points/weights to cell domain*/
+    /* Have to transform quadrature points/weights to cell domain */
     PetscCall(DMPlexComputeCellGeometryFEM(dm, cell, NULL, v0, J, invJ, &detJ));
     PetscCall(PetscArrayzero(n_int, Ns));
     for (q = 0; q < Nq; ++q) {
@@ -752,7 +741,7 @@ PetscErrorCode DMSwarmComputeLocalSizeFromOptions(DM sw)
   PetscCall(PetscOptionsString("-dm_swarm_coordinate_function", "Function to determine particle coordinates", "DMSwarmSetCoordinateFunction", funcname, funcname, sizeof(funcname), &flg));
   PetscOptionsEnd();
   if (flg) {
-    PetscSimplePointFunc coordFunc;
+    PetscSimplePointFn *coordFunc;
 
     PetscCall(DMSwarmGetNumSpecies(sw, &Ns));
     PetscCall(PetscDLSym(NULL, funcname, (void **)&coordFunc));
@@ -787,14 +776,14 @@ PetscErrorCode DMSwarmComputeLocalSizeFromOptions(DM sw)
 @*/
 PetscErrorCode DMSwarmInitializeCoordinates(DM sw)
 {
-  PetscSimplePointFunc coordFunc;
-  PetscScalar         *weight;
-  PetscReal           *x;
-  PetscInt            *species;
-  void                *ctx;
-  PetscBool            removePoints = PETSC_TRUE;
-  PetscDataType        dtype;
-  PetscInt             Np, p, Ns, dim, d, bs;
+  PetscSimplePointFn *coordFunc;
+  PetscScalar        *weight;
+  PetscReal          *x;
+  PetscInt           *species;
+  void               *ctx;
+  PetscBool           removePoints = PETSC_TRUE;
+  PetscDataType       dtype;
+  PetscInt            Np, p, Ns, dim, d, bs;
 
   PetscFunctionBeginUser;
   PetscCall(DMGetDimension(sw, &dim));
@@ -880,11 +869,11 @@ PetscErrorCode DMSwarmInitializeCoordinates(DM sw)
 @*/
 PetscErrorCode DMSwarmInitializeVelocities(DM sw, PetscProbFunc sampler, const PetscReal v0[])
 {
-  PetscSimplePointFunc velFunc;
-  PetscReal           *v;
-  PetscInt            *species;
-  void                *ctx;
-  PetscInt             dim, Np, p;
+  PetscSimplePointFn *velFunc;
+  PetscReal          *v;
+  PetscInt           *species;
+  void               *ctx;
+  PetscInt            dim, Np, p;
 
   PetscFunctionBegin;
   PetscCall(DMSwarmGetVelocityFunction(sw, &velFunc));
@@ -952,7 +941,7 @@ PetscErrorCode DMSwarmInitializeVelocitiesFromOptions(DM sw, const PetscReal v0[
   PetscCall(PetscOptionsString("-dm_swarm_velocity_function", "Function to determine particle velocities", "DMSwarmSetVelocityFunction", funcname, funcname, sizeof(funcname), &flg));
   PetscOptionsEnd();
   if (flg) {
-    PetscSimplePointFunc velFunc;
+    PetscSimplePointFn *velFunc;
 
     PetscCall(PetscDLSym(NULL, funcname, (void **)&velFunc));
     PetscCheck(velFunc, PetscObjectComm((PetscObject)sw), PETSC_ERR_ARG_WRONG, "Could not locate function %s", funcname);

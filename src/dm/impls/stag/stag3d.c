@@ -8,10 +8,8 @@
 
   Input Parameters:
 + comm         - MPI communicator
-. bndx         - x boundary type, `DM_BOUNDARY_NONE`, `DM_BOUNDARY_PERIODIC`, or
-`DM_BOUNDARY_GHOSTED`
-. bndy         - y boundary type, `DM_BOUNDARY_NONE`, `DM_BOUNDARY_PERIODIC`, or
-`DM_BOUNDARY_GHOSTED`
+. bndx         - x boundary type, `DM_BOUNDARY_NONE`, `DM_BOUNDARY_PERIODIC`, or `DM_BOUNDARY_GHOSTED`
+. bndy         - y boundary type, `DM_BOUNDARY_NONE`, `DM_BOUNDARY_PERIODIC`, or `DM_BOUNDARY_GHOSTED`
 . bndz         - z boundary type, `DM_BOUNDARY_NONE`, `DM_BOUNDARY_PERIODIC`, or `DM_BOUNDARY_GHOSTED`
 . M            - global number of elements in x direction
 . N            - global number of elements in y direction
@@ -25,9 +23,9 @@
 . dof3         - number of degrees of freedom per element/3-cell
 . stencilType  - ghost/halo region type: `DMSTAG_STENCIL_NONE`, `DMSTAG_STENCIL_BOX`, or `DMSTAG_STENCIL_STAR`
 . stencilWidth - width, in elements, of halo/ghost region
-. lx           - array of local x  element counts, of length equal to `m`, summing to `M`
-. ly           - arrays of local y element counts, of length equal to `n`, summing to `N`
-- lz           - arrays of local z element counts, of length equal to `p`, summing to `P`
+. lx           - array of local x  element counts, of length equal to `m`, summing to `M`, or `NULL`
+. ly           - arrays of local y element counts, of length equal to `n`, summing to `N`, or `NULL`
+- lz           - arrays of local z element counts, of length equal to `p`, summing to `P`, or `NULL`
 
   Output Parameter:
 . dm - the new `DMSTAG` object
@@ -65,105 +63,136 @@ PETSC_EXTERN PetscErrorCode DMStagCreate3d(MPI_Comm comm, DMBoundaryType bndx, D
 
 PETSC_INTERN PetscErrorCode DMStagRestrictSimple_3d(DM dmf, Vec xf_local, DM dmc, Vec xc_local)
 {
-  PetscScalar ****LA_xf, ****LA_xc;
-  PetscInt        i, j, k, start[3], n[3], nextra[3], N[3];
-  PetscInt        d, dof[4];
-  PetscInt        slot_back_down_left_coarse, slot_back_down_left_fine;
-  PetscInt        slot_down_left_coarse, slot_back_left_coarse, slot_back_down_coarse, slot_down_left_fine, slot_back_left_fine, slot_back_down_fine;
-  PetscInt        slot_left_coarse, slot_down_coarse, slot_back_coarse, slot_left_fine, slot_down_fine, slot_back_fine;
-  PetscInt        slot_element_fine, slot_element_coarse;
+  PetscInt              Mf, Nf, Pf, Mc, Nc, Pc, factorx, factory, factorz, dof[4];
+  PetscInt              xc, yc, zc, mc, nc, pc, nExtraxc, nExtrayc, nExtrazc, i, j, k, d;
+  PetscInt              ibackdownleftf, ibackdownf, ibackleftf, ibackf, idownleftf, idownf, ileftf, ielemf;
+  PetscInt              ibackdownleftc, ibackdownc, ibackleftc, ibackc, idownleftc, idownc, ileftc, ielemc;
+  const PetscScalar ****arrf;
+  PetscScalar       ****arrc;
 
   PetscFunctionBegin;
+  PetscCall(DMStagGetGlobalSizes(dmf, &Mf, &Nf, &Pf));
+  PetscCall(DMStagGetGlobalSizes(dmc, &Mc, &Nc, &Pc));
+  factorx = Mf / Mc;
+  factory = Nf / Nc;
+  factorz = Pf / Pc;
   PetscCall(DMStagGetDOF(dmc, &dof[0], &dof[1], &dof[2], &dof[3]));
-  PetscCall(DMStagGetCorners(dmc, &start[0], &start[1], &start[2], &n[0], &n[1], &n[2], &nextra[0], &nextra[1], &nextra[2]));
-  PetscCall(DMStagGetGlobalSizes(dmc, &N[0], &N[1], &N[2]));
-  if (PetscDefined(USE_DEBUG)) {
-    PetscInt dof_check[4], n_fine[3], start_fine[3];
 
-    PetscCall(DMStagGetDOF(dmf, &dof_check[0], &dof_check[1], &dof_check[2], &dof_check[3]));
-    PetscCall(DMStagGetCorners(dmf, &start_fine[0], &start_fine[1], &start_fine[2], &n_fine[0], &n_fine[1], &n_fine[2], NULL, NULL, NULL));
-    for (d = 0; d < 4; ++d) PetscCheck(dof_check[d] == dof[d], PetscObjectComm((PetscObject)dmf), PETSC_ERR_ARG_INCOMP, "Cannot transfer between DMStag objects with different dof on each stratum");
-    for (d = 0; d < 3; ++d) PetscCheck(n_fine[d] == 2 * n[d], PetscObjectComm((PetscObject)dmf), PETSC_ERR_ARG_INCOMP, "Cannot transfer between DMStag objects unless there is a 2-1 coarsening");
-    for (d = 0; d < 3; ++d) PetscCheck(start_fine[d] == 2 * start[d], PetscObjectComm((PetscObject)dmf), PETSC_ERR_ARG_INCOMP, "Cannot transfer between DMStag objects unless there is a 2-1 coarsening");
-    {
-      PetscInt size_local, entries_local;
-
-      PetscCall(DMStagGetEntriesLocal(dmf, &entries_local));
-      PetscCall(VecGetLocalSize(xf_local, &size_local));
-      PetscCheck(entries_local == size_local, PETSC_COMM_WORLD, PETSC_ERR_ARG_INCOMP, "Fine vector must be a local vector of size %" PetscInt_FMT ", but a vector of size %" PetscInt_FMT " was supplied", entries_local, size_local);
-    }
-    {
-      PetscInt size_local, entries_local;
-
-      PetscCall(DMStagGetEntriesLocal(dmc, &entries_local));
-      PetscCall(VecGetLocalSize(xc_local, &size_local));
-      PetscCheck(entries_local == size_local, PETSC_COMM_WORLD, PETSC_ERR_ARG_INCOMP, "Coarse vector must be a local vector of size %" PetscInt_FMT ", but a vector of size %" PetscInt_FMT " was supplied", entries_local, size_local);
-    }
-  }
+  PetscCall(DMStagGetCorners(dmc, &xc, &yc, &zc, &mc, &nc, &pc, &nExtraxc, &nExtrayc, &nExtrazc));
   PetscCall(VecZeroEntries(xc_local));
-  PetscCall(DMStagVecGetArray(dmf, xf_local, &LA_xf));
-  PetscCall(DMStagVecGetArray(dmc, xc_local, &LA_xc));
-  PetscCall(DMStagGetLocationSlot(dmf, DMSTAG_BACK_DOWN_LEFT, 0, &slot_back_down_left_fine));
-  PetscCall(DMStagGetLocationSlot(dmf, DMSTAG_DOWN_LEFT, 0, &slot_down_left_fine));
-  PetscCall(DMStagGetLocationSlot(dmf, DMSTAG_BACK_LEFT, 0, &slot_back_left_fine));
-  PetscCall(DMStagGetLocationSlot(dmf, DMSTAG_BACK_DOWN, 0, &slot_back_down_fine));
-  PetscCall(DMStagGetLocationSlot(dmf, DMSTAG_LEFT, 0, &slot_left_fine));
-  PetscCall(DMStagGetLocationSlot(dmf, DMSTAG_DOWN, 0, &slot_down_fine));
-  PetscCall(DMStagGetLocationSlot(dmf, DMSTAG_BACK, 0, &slot_back_fine));
-  PetscCall(DMStagGetLocationSlot(dmf, DMSTAG_ELEMENT, 0, &slot_element_fine));
-  PetscCall(DMStagGetLocationSlot(dmc, DMSTAG_BACK_DOWN_LEFT, 0, &slot_back_down_left_coarse));
-  PetscCall(DMStagGetLocationSlot(dmc, DMSTAG_DOWN_LEFT, 0, &slot_down_left_coarse));
-  PetscCall(DMStagGetLocationSlot(dmc, DMSTAG_BACK_LEFT, 0, &slot_back_left_coarse));
-  PetscCall(DMStagGetLocationSlot(dmc, DMSTAG_BACK_DOWN, 0, &slot_back_down_coarse));
-  PetscCall(DMStagGetLocationSlot(dmc, DMSTAG_LEFT, 0, &slot_left_coarse));
-  PetscCall(DMStagGetLocationSlot(dmc, DMSTAG_DOWN, 0, &slot_down_coarse));
-  PetscCall(DMStagGetLocationSlot(dmc, DMSTAG_BACK, 0, &slot_back_coarse));
-  PetscCall(DMStagGetLocationSlot(dmc, DMSTAG_ELEMENT, 0, &slot_element_coarse));
-  for (k = start[2]; k < start[2] + n[2] + nextra[2]; k++) {
-    for (j = start[1]; j < start[1] + n[1] + nextra[1]; j++) {
-      for (i = start[0]; i < start[0] + n[0] + nextra[0]; i++) {
-        // Vertices: inject
-        for (d = 0; d < dof[0]; ++d) LA_xc[k][j][i][slot_back_down_left_coarse + d] = LA_xf[2 * k][2 * j][2 * i][slot_back_down_left_fine + d];
+  PetscCall(DMStagVecGetArray(dmf, xf_local, &arrf));
+  PetscCall(DMStagVecGetArray(dmc, xc_local, &arrc));
+  PetscCall(DMStagGetLocationSlot(dmf, DMSTAG_BACK_DOWN_LEFT, 0, &ibackdownleftf));
+  PetscCall(DMStagGetLocationSlot(dmf, DMSTAG_BACK_DOWN, 0, &ibackdownf));
+  PetscCall(DMStagGetLocationSlot(dmf, DMSTAG_BACK_LEFT, 0, &ibackleftf));
+  PetscCall(DMStagGetLocationSlot(dmf, DMSTAG_BACK, 0, &ibackf));
+  PetscCall(DMStagGetLocationSlot(dmf, DMSTAG_DOWN_LEFT, 0, &idownleftf));
+  PetscCall(DMStagGetLocationSlot(dmf, DMSTAG_DOWN, 0, &idownf));
+  PetscCall(DMStagGetLocationSlot(dmf, DMSTAG_LEFT, 0, &ileftf));
+  PetscCall(DMStagGetLocationSlot(dmf, DMSTAG_ELEMENT, 0, &ielemf));
+  PetscCall(DMStagGetLocationSlot(dmc, DMSTAG_BACK_DOWN_LEFT, 0, &ibackdownleftc));
+  PetscCall(DMStagGetLocationSlot(dmc, DMSTAG_BACK_DOWN, 0, &ibackdownc));
+  PetscCall(DMStagGetLocationSlot(dmc, DMSTAG_BACK_LEFT, 0, &ibackleftc));
+  PetscCall(DMStagGetLocationSlot(dmc, DMSTAG_BACK, 0, &ibackc));
+  PetscCall(DMStagGetLocationSlot(dmc, DMSTAG_DOWN_LEFT, 0, &idownleftc));
+  PetscCall(DMStagGetLocationSlot(dmc, DMSTAG_DOWN, 0, &idownc));
+  PetscCall(DMStagGetLocationSlot(dmc, DMSTAG_LEFT, 0, &ileftc));
+  PetscCall(DMStagGetLocationSlot(dmc, DMSTAG_ELEMENT, 0, &ielemc));
 
-        // Edges: average 2 fine edges
-        if (i < N[0]) {
-          for (d = 0; d < dof[1]; ++d) LA_xc[k][j][i][slot_back_down_coarse + d] = 0.5 * (LA_xf[2 * k][2 * j][2 * i][slot_back_down_fine + d] + LA_xf[2 * k][2 * j][2 * i + 1][slot_back_down_fine + d]);
-        }
-        if (j < N[1]) {
-          for (d = 0; d < dof[1]; ++d) LA_xc[k][j][i][slot_back_left_coarse + d] = 0.5 * (LA_xf[2 * k][2 * j][2 * i][slot_back_left_fine + d] + LA_xf[2 * k][2 * j + 1][2 * i][slot_back_left_fine + d]);
-        }
-        if (k < N[2]) {
-          for (d = 0; d < dof[1]; ++d) LA_xc[k][j][i][slot_down_left_coarse + d] = 0.5 * (LA_xf[2 * k][2 * j][2 * i][slot_down_left_fine + d] + LA_xf[2 * k + 1][2 * j][2 * i][slot_down_left_fine + d]);
+  for (d = 0; d < dof[0]; ++d)
+    for (k = zc; k < zc + pc + nExtrazc; ++k)
+      for (j = yc; j < yc + nc + nExtrayc; ++j)
+        for (i = xc; i < xc + mc + nExtraxc; ++i) {
+          const PetscInt ii = i * factorx, jj = j * factory, kk = k * factorz;
+
+          arrc[k][j][i][ibackdownleftc + d] = arrf[kk][jj][ii][ibackdownleftf + d];
         }
 
-        // Faces: average 4 fine faces
-        if (i < N[0] && j < N[1]) {
-          for (d = 0; d < dof[2]; ++d) {
-            LA_xc[k][j][i][slot_back_coarse + d] = 0.25 * (LA_xf[2 * k][2 * j][2 * i][slot_back_fine + d] + LA_xf[2 * k][2 * j][2 * i + 1][slot_back_fine + d] + LA_xf[2 * k][2 * j + 1][2 * i][slot_back_fine + d] + LA_xf[2 * k][2 * j + 1][2 * i + 1][slot_back_fine + d]);
-          }
-        }
-        if (i < N[0] && k < N[2]) {
-          for (d = 0; d < dof[2]; ++d) {
-            LA_xc[k][j][i][slot_down_coarse + d] = 0.25 * (LA_xf[2 * k][2 * j][2 * i][slot_down_fine + d] + LA_xf[2 * k][2 * j][2 * i + 1][slot_down_fine + d] + LA_xf[2 * k + 1][2 * j][2 * i][slot_down_fine + d] + LA_xf[2 * k + 1][2 * j][2 * i + 1][slot_down_fine + d]);
-          }
-        }
-        if (j < N[1] && k < N[2]) {
-          for (d = 0; d < dof[2]; ++d) {
-            LA_xc[k][j][i][slot_left_coarse + d] = 0.25 * (LA_xf[2 * k][2 * j][2 * i][slot_left_fine + d] + LA_xf[2 * k][2 * j][2 * i + 1][slot_left_fine + d] + LA_xf[2 * k][2 * j + 1][2 * i][slot_left_fine + d] + LA_xf[2 * k][2 * j + 1][2 * i + 1][slot_left_fine + d]);
-          }
+  for (d = 0; d < dof[1]; ++d)
+    for (k = zc; k < zc + pc + nExtrazc; ++k)
+      for (j = yc; j < yc + nc + nExtrayc; ++j)
+        for (i = xc; i < xc + mc; ++i) {
+          const PetscInt ii = i * factorx + factorx / 2, jj = j * factory, kk = k * factorz;
+
+          if (factorx % 2 == 0) arrc[k][j][i][ibackdownc + d] = 0.5 * (arrf[kk][jj][ii - 1][ibackdownf + d] + arrf[kk][jj][ii][ibackdownf + d]);
+          else arrc[k][j][i][ibackdownc + d] = arrf[kk][jj][ii][ibackdownf + d];
         }
 
-        // Element: average 8 fine elements
-        if (i < N[0] && j < N[1] && k < N[2]) {
-          for (d = 0; d < dof[3]; ++d) {
-            LA_xc[k][j][i][slot_element_coarse + d] = 0.125 * (LA_xf[2 * k][2 * j][2 * i][slot_element_fine + d] + LA_xf[2 * k][2 * j][2 * i + 1][slot_element_fine + d] + LA_xf[2 * k][2 * j + 1][2 * i][slot_element_fine + d] + LA_xf[2 * k][2 * j + 1][2 * i + 1][slot_element_fine + d] + LA_xf[2 * k + 1][2 * j][2 * i][slot_element_fine + d] + LA_xf[2 * k + 1][2 * j][2 * i + 1][slot_element_fine + d] + LA_xf[2 * k + 1][2 * j + 1][2 * i][slot_element_fine + d] + LA_xf[2 * k + 1][2 * j + 1][2 * i + 1][slot_element_fine + d]);
-          }
+  for (d = 0; d < dof[1]; ++d)
+    for (k = zc; k < zc + pc + nExtrazc; ++k)
+      for (j = yc; j < yc + nc; ++j)
+        for (i = xc; i < xc + mc + nExtraxc; ++i) {
+          const PetscInt ii = i * factorx, jj = j * factory + factory / 2, kk = k * factorz;
+
+          if (factory % 2 == 0) arrc[k][j][i][ibackleftc + d] = 0.5 * (arrf[kk][jj - 1][ii][ibackleftf + d] + arrf[kk][jj][ii][ibackleftf + d]);
+          else arrc[k][j][i][ibackleftc + d] = arrf[kk][jj][ii][ibackleftf + d];
         }
-      }
-    }
-  }
-  PetscCall(DMStagVecRestoreArray(dmf, xf_local, &LA_xf));
-  PetscCall(DMStagVecRestoreArray(dmc, xc_local, &LA_xc));
+
+  for (d = 0; d < dof[1]; ++d)
+    for (k = zc; k < zc + pc; ++k)
+      for (j = yc; j < yc + nc + nExtrayc; ++j)
+        for (i = xc; i < xc + mc + nExtraxc; ++i) {
+          const PetscInt ii = i * factorx, jj = j * factory, kk = k * factorz + factorz / 2;
+
+          if (factorz % 2 == 0) arrc[k][j][i][idownleftc + d] = 0.5 * (arrf[kk - 1][jj][ii][idownleftf + d] + arrf[kk][jj][ii][idownleftf + d]);
+          else arrc[k][j][i][idownleftc + d] = arrf[kk][jj][ii][idownleftf + d];
+        }
+
+  for (d = 0; d < dof[2]; ++d)
+    for (k = zc; k < zc + pc + nExtrazc; ++k)
+      for (j = yc; j < yc + nc; ++j)
+        for (i = xc; i < xc + mc; ++i) {
+          const PetscInt ii = i * factorx + factorx / 2, jj = j * factory + factory / 2, kk = k * factorz;
+
+          if (factorx % 2 == 0 && factory % 2 == 0) arrc[k][j][i][ibackc + d] = 0.25 * (arrf[kk][jj - 1][ii - 1][ibackf + d] + arrf[kk][jj - 1][ii][ibackf + d] + arrf[kk][jj][ii - 1][ibackf + d] + arrf[kk][jj][ii][ibackf + d]);
+          else if (factorx % 2 == 0) arrc[k][j][i][ibackc + d] = 0.5 * (arrf[kk][jj][ii - 1][ibackf + d] + arrf[kk][jj][ii][ibackf + d]);
+          else if (factory % 2 == 0) arrc[k][j][i][ibackc + d] = 0.5 * (arrf[kk][jj - 1][ii][ibackf + d] + arrf[kk][jj][ii][ibackf + d]);
+          else arrc[k][j][i][ibackc + d] = arrf[kk][jj][ii][ibackf + d];
+        }
+
+  for (d = 0; d < dof[2]; ++d)
+    for (k = zc; k < zc + pc; ++k)
+      for (j = yc; j < yc + nc + nExtrayc; ++j)
+        for (i = xc; i < xc + mc; ++i) {
+          const PetscInt ii = i * factorx + factorx / 2, jj = j * factory, kk = k * factorz + factorz / 2;
+
+          if (factorx % 2 == 0 && factorz % 2 == 0) arrc[k][j][i][idownc + d] = 0.25 * (arrf[kk - 1][jj][ii - 1][idownf + d] + arrf[kk - 1][jj][ii][idownf + d] + arrf[kk][jj][ii - 1][idownf + d] + arrf[kk][jj][ii][idownf + d]);
+          else if (factorx % 2 == 0) arrc[k][j][i][idownc + d] = 0.5 * (arrf[kk][jj][ii - 1][idownf + d] + arrf[kk][jj][ii][idownf + d]);
+          else if (factorz % 2 == 0) arrc[k][j][i][idownc + d] = 0.5 * (arrf[kk - 1][jj][ii][idownf + d] + arrf[kk][jj][ii][idownf + d]);
+          else arrc[k][j][i][idownc + d] = arrf[kk][jj][ii][idownf + d];
+        }
+
+  for (d = 0; d < dof[2]; ++d)
+    for (k = zc; k < zc + pc; ++k)
+      for (j = yc; j < yc + nc; ++j)
+        for (i = xc; i < xc + mc + nExtraxc; ++i) {
+          const PetscInt ii = i * factorx, jj = j * factory + factory / 2, kk = k * factorz + factorz / 2;
+
+          if (factory % 2 == 0 && factorz % 2 == 0) arrc[k][j][i][ileftc + d] = 0.25 * (arrf[kk - 1][jj - 1][ii][ileftf + d] + arrf[kk - 1][jj][ii][ileftf + d] + arrf[kk][jj - 1][ii][ileftf + d] + arrf[kk][jj][ii][ileftf + d]);
+          else if (factory % 2 == 0) arrc[k][j][i][ileftc + d] = 0.5 * (arrf[kk][jj - 1][ii][ileftf + d] + arrf[kk][jj][ii][ileftf + d]);
+          else if (factorz % 2 == 0) arrc[k][j][i][ileftc + d] = 0.5 * (arrf[kk - 1][jj][ii][ileftf + d] + arrf[kk][jj][ii][ileftf + d]);
+          else arrc[k][j][i][ileftc + d] = arrf[kk][jj][ii][ileftf + d];
+        }
+
+  for (d = 0; d < dof[3]; ++d)
+    for (k = zc; k < zc + pc; ++k)
+      for (j = yc; j < yc + nc; ++j)
+        for (i = xc; i < xc + mc; ++i) {
+          const PetscInt ii = i * factorx + factorx / 2, jj = j * factory + factory / 2, kk = k * factorz + factorz / 2;
+
+          if (factorx % 2 == 0 && factory % 2 == 0 && factorz % 2 == 0)
+            arrc[k][j][i][ielemc + d] = 0.125 * (arrf[kk - 1][jj - 1][ii - 1][ielemf + d] + arrf[kk - 1][jj - 1][ii][ielemf + d] + arrf[kk - 1][jj][ii - 1][ielemf + d] + arrf[kk - 1][jj][ii][ielemf + d] + arrf[kk][jj - 1][ii - 1][ielemf + d] + arrf[kk][jj - 1][ii][ielemf + d] + arrf[kk][jj][ii - 1][ielemf + d] + arrf[kk][jj][ii][ielemf + d]);
+          else if (factorx % 2 == 0 && factory % 2 == 0) arrc[k][j][i][ielemc + d] = 0.25 * (arrf[kk][jj - 1][ii - 1][ielemf + d] + arrf[kk][jj - 1][ii][ielemf + d] + arrf[kk][jj][ii - 1][ielemf + d] + arrf[kk][jj][ii][ielemf + d]);
+          else if (factorx % 2 == 0 && factorz % 2 == 0) arrc[k][j][i][ielemc + d] = 0.25 * (arrf[kk - 1][jj][ii - 1][ielemf + d] + arrf[kk - 1][jj][ii][ielemf + d] + arrf[kk][jj][ii - 1][ielemf + d] + arrf[kk][jj][ii][ielemf + d]);
+          else if (factory % 2 == 0 && factorz % 2 == 0) arrc[k][j][i][ielemc + d] = 0.25 * (arrf[kk - 1][jj - 1][ii][ielemf + d] + arrf[kk - 1][jj][ii][ielemf + d] + arrf[kk][jj - 1][ii][ielemf + d] + arrf[kk][jj][ii][ielemf + d]);
+          else if (factorx % 2 == 0) arrc[k][j][i][ielemc + d] = 0.5 * (arrf[kk][jj][ii - 1][ielemf + d] + arrf[kk][jj][ii][ielemf + d]);
+          else if (factory % 2 == 0) arrc[k][j][i][ielemc + d] = 0.5 * (arrf[kk][jj - 1][ii][ielemf + d] + arrf[kk][jj][ii][ielemf + d]);
+          else if (factorz % 2 == 0) arrc[k][j][i][ielemc + d] = 0.5 * (arrf[kk - 1][jj][ii][ielemf + d] + arrf[kk][jj][ii][ielemf + d]);
+          else arrc[k][j][i][ielemc + d] = arrf[kk][jj][ii][ielemf + d];
+        }
+
+  PetscCall(DMStagVecRestoreArray(dmf, xf_local, &arrf));
+  PetscCall(DMStagVecRestoreArray(dmc, xc_local, &arrc));
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
@@ -425,7 +454,6 @@ PETSC_INTERN PetscErrorCode DMSetUp_Stag_3d(DM dm)
 
   /* View from Options */
   PetscCall(DMViewFromOptions(dm, NULL, "-dm_view"));
-
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
@@ -702,7 +730,6 @@ static PetscErrorCode DMStagSetUpBuildNeighbors_3d(DM dm)
       stag->neighbors[i] = -1;
     }
   }
-
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
@@ -790,7 +817,6 @@ static PetscErrorCode DMStagSetUpBuildGlobalOffsets_3d(DM dm, PetscInt **pGlobal
       /* Don't need to compute entries in last element */
     }
   }
-
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
@@ -1614,7 +1640,6 @@ static PetscErrorCode DMStagSetUpBuildScatter_3d(DM dm, const PetscInt *globalOf
     PetscCall(ISDestroy(&isLocal));  /* frees idxLocal */
     PetscCall(ISDestroy(&isGlobal)); /* free idxGlobal */
   }
-
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
@@ -1629,7 +1654,6 @@ static PetscErrorCode DMStagSetUpBuildL2G_3d(DM dm, const PetscInt *globalOffset
   PetscBool            nextToDummyEnd[3], dummyStart[3], dummyEnd[3], star;
 
   PetscFunctionBegin;
-
   /* Check stencil type */
   PetscCheck(stag->stencilType == DMSTAG_STENCIL_NONE || stag->stencilType == DMSTAG_STENCIL_BOX || stag->stencilType == DMSTAG_STENCIL_STAR, PetscObjectComm((PetscObject)dm), PETSC_ERR_SUP, "Unsupported stencil type %s", DMStagStencilTypes[stag->stencilType]);
   star = (PetscBool)(stag->stencilType == DMSTAG_STENCIL_STAR || stag->stencilType == DMSTAG_STENCIL_NONE);
@@ -3257,6 +3281,112 @@ PETSC_INTERN PetscErrorCode DMStagPopulateLocalToGlobalInjective_3d(DM dm)
   PetscCall(ISDestroy(&isLocal));
   PetscCall(ISDestroy(&isGlobal));
   if (globalOffsetsRecomputed) PetscCall(PetscFree(globalOffsetsRecomputed));
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
+PETSC_INTERN PetscErrorCode DMStagPopulateLocalToLocal3d_Internal(DM dm)
+{
+  DM_Stag *const stag = (DM_Stag *)dm->data;
+  PetscInt      *idxRemap;
+  PetscBool      dummyEnd[3];
+  PetscInt       i, j, k, d, count, leftGhostElements, downGhostElements, backGhostElements, iOffset, jOffset, kOffset;
+  PetscInt       entriesPerRowGhost, entriesPerRowColGhost;
+  PetscInt       dOffset[8] = {0};
+
+  PetscFunctionBegin;
+  PetscCall(VecScatterCopy(stag->gtol, &stag->ltol));
+  PetscCall(PetscMalloc1(stag->entries, &idxRemap));
+
+  for (d = 0; d < 3; ++d) dummyEnd[d] = (PetscBool)(stag->lastRank[d] && stag->boundaryType[d] != DM_BOUNDARY_PERIODIC);
+  leftGhostElements     = stag->start[0] - stag->startGhost[0];
+  downGhostElements     = stag->start[1] - stag->startGhost[1];
+  backGhostElements     = stag->start[2] - stag->startGhost[2];
+  entriesPerRowGhost    = stag->nGhost[0] * stag->entriesPerElement;
+  entriesPerRowColGhost = stag->nGhost[0] * stag->nGhost[1] * stag->entriesPerElement;
+  dOffset[1]            = dOffset[0] + stag->dof[0];
+  dOffset[2]            = dOffset[1] + stag->dof[1];
+  dOffset[3]            = dOffset[2] + stag->dof[1];
+  dOffset[4]            = dOffset[3] + stag->dof[2];
+  dOffset[5]            = dOffset[4] + stag->dof[1];
+  dOffset[6]            = dOffset[5] + stag->dof[2];
+  dOffset[7]            = dOffset[6] + stag->dof[2];
+
+  count = 0;
+  for (k = 0; k < stag->n[2]; ++k) {
+    kOffset = entriesPerRowColGhost * (backGhostElements + k);
+    for (j = 0; j < stag->n[1]; ++j) {
+      jOffset = entriesPerRowGhost * (downGhostElements + j);
+      for (i = 0; i < stag->n[0]; ++i) {
+        iOffset = stag->entriesPerElement * (leftGhostElements + i);
+        // all
+        for (d = 0; d < stag->entriesPerElement; ++d) idxRemap[count++] = kOffset + jOffset + iOffset + d;
+      }
+      if (dummyEnd[0]) {
+        iOffset = stag->entriesPerElement * (leftGhostElements + stag->n[0]);
+        // back down left, back left, down left, left
+        for (d = 0; d < stag->dof[0]; ++d) idxRemap[count++] = kOffset + jOffset + iOffset + dOffset[0] + d;
+        for (d = 0; d < stag->dof[1]; ++d) idxRemap[count++] = kOffset + jOffset + iOffset + dOffset[2] + d;
+        for (d = 0; d < stag->dof[1]; ++d) idxRemap[count++] = kOffset + jOffset + iOffset + dOffset[4] + d;
+        for (d = 0; d < stag->dof[2]; ++d) idxRemap[count++] = kOffset + jOffset + iOffset + dOffset[6] + d;
+      }
+    }
+    if (dummyEnd[1]) {
+      jOffset = entriesPerRowGhost * (downGhostElements + stag->n[1]);
+      for (i = 0; i < stag->n[0]; ++i) {
+        iOffset = stag->entriesPerElement * (leftGhostElements + i);
+        // back down left, back down, down left, down
+        for (d = 0; d < stag->dof[0]; ++d) idxRemap[count++] = kOffset + jOffset + iOffset + dOffset[0] + d;
+        for (d = 0; d < stag->dof[1]; ++d) idxRemap[count++] = kOffset + jOffset + iOffset + dOffset[1] + d;
+        for (d = 0; d < stag->dof[1]; ++d) idxRemap[count++] = kOffset + jOffset + iOffset + dOffset[4] + d;
+        for (d = 0; d < stag->dof[2]; ++d) idxRemap[count++] = kOffset + jOffset + iOffset + dOffset[5] + d;
+      }
+      if (dummyEnd[0]) {
+        iOffset = stag->entriesPerElement * (leftGhostElements + stag->n[0]);
+        // back down left, down left
+        for (d = 0; d < stag->dof[0]; ++d) idxRemap[count++] = kOffset + jOffset + iOffset + dOffset[0] + d;
+        for (d = 0; d < stag->dof[1]; ++d) idxRemap[count++] = kOffset + jOffset + iOffset + dOffset[4] + d;
+      }
+    }
+  }
+  if (dummyEnd[2]) {
+    kOffset = entriesPerRowColGhost * (backGhostElements + stag->n[2]);
+    for (j = 0; j < stag->n[1]; ++j) {
+      jOffset = entriesPerRowGhost * (downGhostElements + j);
+      for (i = 0; i < stag->n[0]; ++i) {
+        iOffset = stag->entriesPerElement * (leftGhostElements + i);
+        // back down left, back down, back left, back
+        for (d = 0; d < stag->dof[0]; ++d) idxRemap[count++] = kOffset + jOffset + iOffset + dOffset[0] + d;
+        for (d = 0; d < stag->dof[1]; ++d) idxRemap[count++] = kOffset + jOffset + iOffset + dOffset[1] + d;
+        for (d = 0; d < stag->dof[1]; ++d) idxRemap[count++] = kOffset + jOffset + iOffset + dOffset[2] + d;
+        for (d = 0; d < stag->dof[2]; ++d) idxRemap[count++] = kOffset + jOffset + iOffset + dOffset[3] + d;
+      }
+      if (dummyEnd[0]) {
+        iOffset = stag->entriesPerElement * (leftGhostElements + stag->n[0]);
+        // back down left, back left
+        for (d = 0; d < stag->dof[0]; ++d) idxRemap[count++] = kOffset + jOffset + iOffset + dOffset[0] + d;
+        for (d = 0; d < stag->dof[1]; ++d) idxRemap[count++] = kOffset + jOffset + iOffset + dOffset[2] + d;
+      }
+    }
+    if (dummyEnd[1]) {
+      jOffset = entriesPerRowGhost * (downGhostElements + stag->n[1]);
+      for (i = 0; i < stag->n[0]; ++i) {
+        iOffset = stag->entriesPerElement * (leftGhostElements + i);
+        // back down left, back down
+        for (d = 0; d < stag->dof[0]; ++d) idxRemap[count++] = kOffset + jOffset + iOffset + dOffset[0] + d;
+        for (d = 0; d < stag->dof[1]; ++d) idxRemap[count++] = kOffset + jOffset + iOffset + dOffset[1] + d;
+      }
+      if (dummyEnd[0]) {
+        iOffset = stag->entriesPerElement * (leftGhostElements + stag->n[0]);
+        // back down left
+        for (d = 0; d < stag->dof[0]; ++d) idxRemap[count++] = kOffset + jOffset + iOffset + dOffset[0] + d;
+      }
+    }
+  }
+
+  PetscCheck(count == stag->entries, PETSC_COMM_SELF, PETSC_ERR_PLIB, "Number of entries computed in ltol (%" PetscInt_FMT ") is not as expected (%" PetscInt_FMT ")", count, stag->entries);
+
+  PetscCall(VecScatterRemap(stag->ltol, idxRemap, NULL));
+  PetscCall(PetscFree(idxRemap));
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 

@@ -704,8 +704,8 @@ typedef enum {
   VECOP_SET        = 10,
   VECOP_VIEW       = 33,
   VECOP_LOAD       = 41,
-  VECOP_VIEWNATIVE = 68,
-  VECOP_LOADNATIVE = 69
+  VECOP_VIEWNATIVE = 69,
+  VECOP_LOADNATIVE = 70
 } VecOperation;
 PETSC_EXTERN PetscErrorCode VecSetOperation(Vec, VecOperation, void (*)(void));
 
@@ -718,6 +718,7 @@ PETSC_EXTERN PetscErrorCode VecCreateGhost(MPI_Comm, PetscInt, PetscInt, PetscIn
 PETSC_EXTERN PetscErrorCode VecCreateGhostWithArray(MPI_Comm, PetscInt, PetscInt, PetscInt, const PetscInt[], const PetscScalar[], Vec *);
 PETSC_EXTERN PetscErrorCode VecCreateGhostBlock(MPI_Comm, PetscInt, PetscInt, PetscInt, PetscInt, const PetscInt[], Vec *);
 PETSC_EXTERN PetscErrorCode VecCreateGhostBlockWithArray(MPI_Comm, PetscInt, PetscInt, PetscInt, PetscInt, const PetscInt[], const PetscScalar[], Vec *);
+PETSC_EXTERN PetscErrorCode VecGhostGetGhostIS(Vec, IS *);
 PETSC_EXTERN PetscErrorCode VecGhostGetLocalForm(Vec, Vec *);
 PETSC_EXTERN PetscErrorCode VecGhostRestoreLocalForm(Vec, Vec *);
 PETSC_EXTERN PetscErrorCode VecGhostIsLocalForm(Vec, Vec, PetscBool *);
@@ -731,6 +732,7 @@ PETSC_EXTERN PetscErrorCode VecRealPart(Vec);
 PETSC_EXTERN PetscErrorCode VecScatterCreateToAll(Vec, VecScatter *, Vec *);
 PETSC_EXTERN PetscErrorCode VecScatterCreateToZero(Vec, VecScatter *, Vec *);
 
+/* These vector calls were included from TAO. They miss vtable entries and GPU implementation */
 PETSC_EXTERN PetscErrorCode ISComplementVec(IS, Vec, IS *);
 PETSC_EXTERN PetscErrorCode VecPow(Vec, PetscScalar);
 PETSC_EXTERN PetscErrorCode VecMedian(Vec, Vec, Vec, Vec);
@@ -743,6 +745,7 @@ PETSC_EXTERN PetscErrorCode VecWhichEqual(Vec, Vec, IS *);
 PETSC_EXTERN PetscErrorCode VecISAXPY(Vec, IS, PetscScalar, Vec);
 PETSC_EXTERN PetscErrorCode VecISCopy(Vec, IS, ScatterMode, Vec);
 PETSC_EXTERN PetscErrorCode VecISSet(Vec, IS, PetscScalar);
+PETSC_EXTERN PetscErrorCode VecISShift(Vec, IS, PetscScalar);
 PETSC_EXTERN PetscErrorCode VecBoundGradientProjection(Vec, Vec, Vec, Vec, Vec);
 PETSC_EXTERN PetscErrorCode VecStepBoundInfo(Vec, Vec, Vec, Vec, PetscReal *, PetscReal *, PetscReal *);
 PETSC_EXTERN PetscErrorCode VecStepMax(Vec, Vec, PetscReal *);
@@ -758,7 +761,7 @@ PETSC_EXTERN PetscErrorCode PetscViewerMathematicaPutVector(PetscViewer, Vec);
    Level: advanced
 
    Notes:
-   Temporary construct for handling multiply right hand side solves
+   Temporary construct for handling multiply right-hand side solves
 
    This is faked by storing a single vector that has enough array space for
    n vectors

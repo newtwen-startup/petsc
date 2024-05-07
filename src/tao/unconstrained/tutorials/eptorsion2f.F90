@@ -105,7 +105,7 @@
 
       PetscCallA(PetscOptionsHasName(PETSC_NULL_OPTIONS,PETSC_NULL_CHARACTER,'-testmonitor',flg,ierr))
       if (flg) then
-         PetscCallA(TaoSetMonitor(tao,Monitor,dummy,PETSC_NULL_FUNCTION,ierr))
+         PetscCallA(TaoMonitorSet(tao,Monitor,dummy,PETSC_NULL_FUNCTION,ierr))
       endif
 
       PetscCallA(PetscOptionsHasName(PETSC_NULL_OPTIONS,PETSC_NULL_CHARACTER,'-testconvergence',flg, ierr))
@@ -179,7 +179,6 @@
       end do
       PetscCall(VecAssemblyBegin(X,ierr))
       PetscCall(VecAssemblyEnd(X,ierr))
-      return
       end
 
 ! ---------------------------------------------------------------------
@@ -357,7 +356,6 @@
 !  Sum function contributions from all processes
       PetscCallMPI(MPI_Allreduce(floc,f,1,MPIU_SCALAR,MPIU_SUM,PETSC_COMM_WORLD,ierr))
       PetscCall(PetscLogFlops(20.0d0*(ye-ysm)*(xe-xsm)+16.0d0*(xep-xs)*(yep-ys),ierr))
-      return
       end
 
       subroutine ComputeHessian(tao, X, H, Hpre, dummy, ierr)
@@ -433,7 +431,6 @@
       PetscCall(PetscLogFlops(9.0d0*xm*ym + 49.0d0*xm,ierr))
 
       ierr = 0
-      return
       end
 
       subroutine Monitor(tao, dummy, ierr)
@@ -455,7 +452,6 @@
 
       ierr = 0
 
-      return
       end
 
       subroutine ConvergenceTest(tao, dummy, ierr)
@@ -477,7 +473,6 @@
 
       ierr = 0
 
-      return
       end
 
 !/*TEST
@@ -486,12 +481,12 @@
 !      requires: !complex
 !
 !   test:
-!      args: -tao_smonitor -tao_type nls -tao_gttol 1.e-2
+!      args: -tao_monitor_short -tao_type nls -tao_gttol 1.e-2
 !
 !   test:
 !      suffix: 2
 !      nsize: 2
-!      args: -tao_smonitor -tao_type lmvm -tao_gttol 1.e-2
+!      args: -tao_monitor_short -tao_type lmvm -tao_gttol 1.e-2
 !
 !   test:
 !      suffix: 3

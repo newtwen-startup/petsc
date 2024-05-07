@@ -60,7 +60,7 @@ static PetscErrorCode DMFieldView_DA(DMField field, PetscViewer viewer)
     PetscInt _k, _l; \
     for (_k = 0; _k < (c); _k++) (y)[_k] = 0.; \
     for (_l = 0; _l < (m); _l++) { \
-      for (_k = 0; _k < (c); _k++) (y)[_k] += cast((A)[(c)*_l + _k]) * (x)[_l]; \
+      for (_k = 0; _k < (c); _k++) (y)[_k] += cast((A)[(c) * _l + _k]) * (x)[_l]; \
     } \
   } while (0)
 
@@ -193,7 +193,7 @@ static PetscErrorCode DMFieldEvaluate_DA(DMField field, Vec points, PetscDataTyp
   PetscCall(VecGetLocalSize(points, &N));
   PetscCheck(N % dim == 0, PETSC_COMM_SELF, PETSC_ERR_ARG_INCOMP, "Point vector size %" PetscInt_FMT " not divisible by coordinate dimension %" PetscInt_FMT, N, dim);
   n          = N / dim;
-  coordRange = &(dafield->coordRange[0]);
+  coordRange = &dafield->coordRange[0];
   PetscCall(VecGetArrayRead(points, &array));
   MultilinearEvaluate(dim, coordRange, nc, dafield->cornerCoeffs, dafield->work, n, array, datatype, B, D, H);
   PetscCall(VecRestoreArrayRead(points, &array));
@@ -265,13 +265,13 @@ static PetscErrorCode DMFieldEvaluateFE_DA(DMField field, IS cellIS, PetscQuadra
     void    *cB, *cD, *cH;
 
     if (datatype == PETSC_SCALAR) {
-      cB = B ? &((PetscScalar *)B)[nc * nq * c] : NULL;
-      cD = D ? &((PetscScalar *)D)[nc * nq * dim * c] : NULL;
-      cH = H ? &((PetscScalar *)H)[nc * nq * dim * dim * c] : NULL;
+      cB = PetscSafePointerPlusOffset((PetscScalar *)B, nc * nq * c);
+      cD = PetscSafePointerPlusOffset((PetscScalar *)D, nc * nq * dim * c);
+      cH = PetscSafePointerPlusOffset((PetscScalar *)H, nc * nq * dim * dim * c);
     } else {
-      cB = B ? &((PetscReal *)B)[nc * nq * c] : NULL;
-      cD = D ? &((PetscReal *)D)[nc * nq * dim * c] : NULL;
-      cH = H ? &((PetscReal *)H)[nc * nq * dim * dim * c] : NULL;
+      cB = PetscSafePointerPlusOffset(((PetscReal *)B), nc * nq * c);
+      cD = PetscSafePointerPlusOffset(((PetscReal *)D), nc * nq * dim * c);
+      cH = PetscSafePointerPlusOffset(((PetscReal *)H), nc * nq * dim * dim * c);
     }
     PetscCheck(cell >= cStart && cell < cEnd, PETSC_COMM_SELF, PETSC_ERR_ARG_OUTOFRANGE, "Point %" PetscInt_FMT " not a cell [%" PetscInt_FMT ",%" PetscInt_FMT "), not implemented yet", cell, cStart, cEnd);
     for (i = 0; i < nc * whol; i++) work[i] = dafield->cornerCoeffs[i];
@@ -393,7 +393,6 @@ static PetscErrorCode DMFieldCreateDefaultQuadrature_DA(DMField field, IS cellIS
   }
   dim -= h;
   if (dim > 0) PetscCall(PetscDTGaussTensorQuadrature(dim, 1, 1, -1.0, 1.0, quad));
-
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
@@ -436,7 +435,7 @@ static PetscErrorCode DMFieldInitialize_DA(DMField field)
       }
     }
     PetscCall(VecRestoreArrayRead(coords, &array));
-    PetscCall(MPIU_Allreduce((PetscReal *)mins, &(dafield->coordRange[0][0]), 2 * dim, MPIU_REAL, MPI_MIN, PetscObjectComm((PetscObject)dm)));
+    PetscCall(MPIU_Allreduce((PetscReal *)mins, &dafield->coordRange[0][0], 2 * dim, MPIU_REAL, MPI_MIN, PetscObjectComm((PetscObject)dm)));
     for (j = 0; j < dim; j++) dafield->coordRange[j][1] = -dafield->coordRange[j][1];
   } else {
     for (j = 0; j < dim; j++) {

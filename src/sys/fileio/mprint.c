@@ -84,7 +84,7 @@ PetscErrorCode PetscFormatConvertGetSize(const char *format, size_t *size)
 . format - the PETSc format string
 
   Output Parameter:
-. newformat - the formatted string
+. newformat - the formatted string, must be long enough to hold result
 
   Level: developer
 
@@ -149,8 +149,7 @@ PetscErrorCode PetscFormatConvert(const char *format, char *newformat)
 #define PETSCDEFAULTBUFFERSIZE 8 * 1024
 
 /*@C
-  PetscVSNPrintf - The PETSc version of `vsnprintf()`. Ensures that all `%g` formatted arguments' output contains the decimal point (which
-  is used by the test harness)
+  PetscVSNPrintf - The PETSc version of `vsnprintf()`. Ensures that all `%g` formatted arguments' output contains the decimal point (which is used by the test harness)
 
   Input Parameters:
 + str    - location to put result
@@ -360,10 +359,15 @@ PetscErrorCode PetscVFPrintfDefault(FILE *fd, const char *format, va_list Argp)
   va_end(Argpcopy);
 #endif
   {
-    const int err = fprintf(fd, "%s", buff);
+    int err;
+
+    // POSIX C sets errno but otherwise it may not be set for *printf() system calls
+    // https://pubs.opengroup.org/onlinepubs/9699919799/functions/fprintf.html
+    errno = 0;
+    err   = fprintf(fd, "%s", buff);
     // cannot use PetscCallExternal() for fprintf since the return value is "number of
     // characters transmitted to the output stream" on success
-    PetscCheck(err >= 0, PETSC_COMM_SELF, PETSC_ERR_FILE_WRITE, "fprintf() returned error code %d", err);
+    PetscCheck(err >= 0, PETSC_COMM_SELF, PETSC_ERR_FILE_WRITE, "fprintf() returned error code %d: %s", err, errno > 0 ? strerror(errno) : "unknown (errno not set)");
   }
   PetscCall(PetscFFlush(fd));
   if (buff != str) PetscCall(PetscFree(buff));
@@ -433,16 +437,12 @@ PetscErrorCode PetscSNPrintfCount(char *str, size_t len, const char format[], si
 PrintfQueue petsc_printfqueue = NULL, petsc_printfqueuebase = NULL;
 int         petsc_printfqueuelength = 0;
 
-static inline PetscErrorCode PetscVFPrintf_Private(MPI_Comm comm, FILE *fd, const char format[], va_list Argp)
+static inline PetscErrorCode PetscVFPrintf_Private(FILE *fd, const char format[], va_list Argp)
 {
   const PetscBool tee = (PetscBool)(petsc_history && (fd != petsc_history));
-  PetscMPIInt     rank;
   va_list         cpy;
 
   PetscFunctionBegin;
-  PetscCheck(comm != MPI_COMM_NULL, PETSC_COMM_SELF, PETSC_ERR_PLIB, "Called with MPI_COMM_NULL, likely PetscObjectComm() failed");
-  PetscCallMPI(MPI_Comm_rank(comm, &rank));
-  if (PetscLikely(rank != 0)) PetscFunctionReturn(PETSC_SUCCESS);
   // must do this before we possibly consume Argp
   if (tee) va_copy(cpy, Argp);
   PetscCall((*PetscVFPrintf)(fd, format, Argp));
@@ -453,18 +453,28 @@ static inline PetscErrorCode PetscVFPrintf_Private(MPI_Comm comm, FILE *fd, cons
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
+PETSC_INTERN PetscErrorCode PetscVFPrintf_Internal(FILE *fd, const char format[], ...)
+{
+  va_list Argp;
+
+  PetscFunctionBegin;
+  va_start(Argp, format);
+  PetscCall(PetscVFPrintf_Private(fd, format, Argp));
+  va_end(Argp);
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
 static inline PetscErrorCode PetscSynchronizedFPrintf_Private(MPI_Comm comm, FILE *fp, const char format[], va_list Argp)
 {
   PetscMPIInt rank;
   va_list     cpy;
 
   PetscFunctionBegin;
-  PetscCheck(comm != MPI_COMM_NULL, PETSC_COMM_SELF, PETSC_ERR_PLIB, "Called with MPI_COMM_NULL, likely PetscObjectComm() failed");
   PetscCallMPI(MPI_Comm_rank(comm, &rank));
   /* First processor prints immediately to fp */
   if (rank == 0) {
     va_copy(cpy, Argp);
-    PetscCall(PetscVFPrintf_Private(comm, fp, format, cpy));
+    PetscCall(PetscVFPrintf_Private(fp, format, cpy));
     va_end(cpy);
   } else { /* other processors add to local queue */
     PrintfQueue next;
@@ -568,7 +578,7 @@ PetscErrorCode PetscSynchronizedFPrintf(MPI_Comm comm, FILE *fp, const char form
 
   Input Parameters:
 + comm - the MPI communicator
-- fd   - the file pointer (valid on MPI rank 0 of the communicator)
+- fd   - the file pointer (valid on MPI rank 0 of the communicator), `PETSC_STDOUT` or value obtained from `PetscFOpen()`
 
   Level: intermediate
 
@@ -652,11 +662,14 @@ PetscErrorCode PetscSynchronizedFlush(MPI_Comm comm, FILE *fd)
 @*/
 PetscErrorCode PetscFPrintf(MPI_Comm comm, FILE *fd, const char format[], ...)
 {
-  va_list Argp;
+  PetscMPIInt rank;
+  va_list     Argp;
 
   PetscFunctionBegin;
+  PetscCallMPI(MPI_Comm_rank(comm, &rank));
+  if (PetscLikely(rank != 0)) PetscFunctionReturn(PETSC_SUCCESS);
   va_start(Argp, format);
-  PetscCall(PetscVFPrintf_Private(comm, fd, format, Argp));
+  PetscCall(PetscVFPrintf_Private(fd, format, Argp));
   va_end(Argp);
   PetscFunctionReturn(PETSC_SUCCESS);
 }
@@ -685,22 +698,28 @@ PetscErrorCode PetscFPrintf(MPI_Comm comm, FILE *fd, const char format[], ...)
 @*/
 PetscErrorCode PetscPrintf(MPI_Comm comm, const char format[], ...)
 {
-  va_list Argp;
+  PetscMPIInt rank;
+  va_list     Argp;
 
   PetscFunctionBegin;
+  PetscCallMPI(MPI_Comm_rank(comm, &rank));
+  if (PetscLikely(rank != 0)) PetscFunctionReturn(PETSC_SUCCESS);
   va_start(Argp, format);
-  PetscCall(PetscVFPrintf_Private(comm, PETSC_STDOUT, format, Argp));
+  PetscCall(PetscVFPrintf_Private(PETSC_STDOUT, format, Argp));
   va_end(Argp);
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
 PetscErrorCode PetscHelpPrintfDefault(MPI_Comm comm, const char format[], ...)
 {
-  va_list Argp;
+  PetscMPIInt rank;
+  va_list     Argp;
 
   PetscFunctionBegin;
+  PetscCallMPI(MPI_Comm_rank(comm, &rank));
+  if (PetscLikely(rank != 0)) PetscFunctionReturn(PETSC_SUCCESS);
   va_start(Argp, format);
-  PetscCall(PetscVFPrintf_Private(comm, PETSC_STDOUT, format, Argp));
+  PetscCall(PetscVFPrintf_Private(PETSC_STDOUT, format, Argp));
   va_end(Argp);
   PetscFunctionReturn(PETSC_SUCCESS);
 }

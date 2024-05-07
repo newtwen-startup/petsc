@@ -9,7 +9,6 @@ static PetscErrorCode ISGetBlockGlobalIS(IS is, Vec vec, PetscInt bs, IS *isBloc
   PetscLayout     map;
 
   PetscFunctionBegin;
-
   PetscCall(VecGetLayout(vec, &map));
   rstart = map->rstart / bs;
   PetscCall(ISGetLocalSize(is, &n));
@@ -113,7 +112,7 @@ int main(int argc, char **argv)
         PetscCall(PetscViewerASCIIPopTab(viewer));
       }
     }
-    PetscCall(PetscViewerDestroy(&viewer));
+    PetscCall(PetscOptionsRestoreViewer(&viewer));
     PetscCall(PetscFree(boxes));
   }
 

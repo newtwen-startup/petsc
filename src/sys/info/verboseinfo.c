@@ -82,13 +82,10 @@ PetscErrorCode PetscInfoAllow(PetscBool flag)
   Not Collective
 
   Input Parameters:
-+ filename - Name of the file where `PetscInfo()` will print to
++ filename - Name of the file where `PetscInfo()` will print to, use `NULL` to write to `PETSC_STDOUT`.
 - mode     - Write mode passed to `PetscFOpen()`
 
   Level: advanced
-
-  Note:
-  Use `filename = NULL` to set `PetscInfo()` to write to `PETSC_STDOUT`.
 
 .seealso: [](sec_PetscInfo), `PetscInfo()`, `PetscInfoGetFile()`, `PetscInfoSetFromOptions()`, `PetscFOpen()`
 @*/
@@ -137,7 +134,7 @@ PetscErrorCode PetscInfoSetFile(const char filename[], const char mode[])
 
   Note:
   This routine allocates and copies the `filename` so that the `filename` survives `PetscInfoDestroy()`. The user is
-  therefore responsible for freeing the allocated `filename` pointer afterwards.
+  therefore responsible for freeing the allocated `filename` pointer with `PetscFree()`
 
 .seealso: [](sec_PetscInfo), `PetscInfo()`, `PetscInfoSetFile()`, `PetscInfoSetFromOptions()`, `PetscInfoDestroy()`
 @*/
@@ -519,7 +516,8 @@ PetscErrorCode PetscInfoActivateClass(PetscClassId classid)
   messages are also printed to the history file, called by default
   .petschistory in ones home directory.
 */
-PETSC_INTERN FILE *petsc_history;
+PETSC_INTERN FILE          *petsc_history;
+PETSC_INTERN PetscErrorCode PetscVFPrintf_Internal(FILE *, const char[], ...);
 
 /*MC
   PetscInfo - Logs informative data
@@ -589,9 +587,9 @@ PetscErrorCode PetscInfo_Private(const char func[], PetscObject obj, const char 
 {
   PetscClassId classid = PETSC_SMALLEST_CLASSID;
   PetscBool    enabled = PETSC_FALSE;
-  MPI_Comm     comm    = PETSC_COMM_SELF;
-  PetscMPIInt  rank;
-  const char  *otype = NULL;
+  MPI_Comm     comm    = MPI_COMM_NULL;
+  PetscMPIInt  rank    = 0;
+  const char  *otype   = NULL;
 
   PetscFunctionBegin;
   if (obj) {
@@ -604,14 +602,14 @@ PetscErrorCode PetscInfo_Private(const char func[], PetscObject obj, const char 
   if (obj) {
     PetscCall(PetscObjectGetComm(obj, &comm));
     PetscCall(PetscObjectGetType(obj, &otype));
+    PetscCallMPI(MPI_Comm_rank(comm, &rank));
   }
-  PetscCallMPI(MPI_Comm_rank(comm, &rank));
   /* rank > 0 always jumps out */
   if (rank) PetscFunctionReturn(PETSC_SUCCESS);
   else {
-    PetscMPIInt size;
+    PetscMPIInt size = 1;
 
-    PetscCallMPI(MPI_Comm_size(comm, &size));
+    if (comm != MPI_COMM_NULL) PetscCallMPI(MPI_Comm_size(comm, &size));
     /* If no self printing is allowed, and size too small, get out */
     if ((PetscInfoCommFilter == PETSC_INFO_COMM_NO_SELF) && (size < 2)) PetscFunctionReturn(PETSC_SUCCESS);
     /* If ONLY self printing, and size too big, get out */
@@ -636,7 +634,7 @@ PetscErrorCode PetscInfo_Private(const char func[], PetscObject obj, const char 
     va_start(Argp, message);
     PetscCall(PetscVSNPrintf(string + len, 8 * 1024 - len, message, &fullLength, Argp));
     va_end(Argp);
-    PetscCall(PetscFPrintf(PETSC_COMM_SELF, PetscInfoFile, "%s", string));
+    PetscCall(PetscVFPrintf_Internal(PetscInfoFile, "%s", string));
     PetscCall(PetscFFlush(PetscInfoFile));
     if (petsc_history) {
       va_start(Argp, message);

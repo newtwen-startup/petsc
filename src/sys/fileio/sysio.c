@@ -167,7 +167,7 @@ static PetscErrorCode PetscByteSwapReal(PetscReal *buff, PetscInt n)
 
 /*
   PetscByteSwapScalar - Swap bytes in a PetscScalar
-  The complex case is dealt with with an array of PetscReal, twice as long.
+  The complex case is dealt with an array of PetscReal, twice as long.
 */
 static PetscErrorCode PetscByteSwapScalar(PetscScalar *buff, PetscInt n)
 {
@@ -543,7 +543,7 @@ PetscErrorCode PetscBinaryClose(int fd)
   Input Parameters:
 + fd     - the file
 . off    - number of bytes to move. Use `PETSC_BINARY_INT_SIZE`, `PETSC_BINARY_SCALAR_SIZE`,
-            etc. in your calculation rather than `sizeof()` to compute byte lengths.
+           etc. in your calculation rather than `sizeof()` to compute byte lengths.
 - whence - see `PetscBinarySeekType` for possible values
 
   Output Parameter:

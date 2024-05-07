@@ -4,7 +4,8 @@ import os
 class Configure(config.package.GNUPackage):
   def __init__(self, framework):
     config.package.GNUPackage.__init__(self, framework)
-    self.gitcommit         = '56b58bd7a5462ef85e136cea9fd9ee6bf9558e71'
+    self.version           = '2.8.6'
+    self.gitcommit         = 'v'+self.version
     self.download          = ['git://https://github.com/cburstedde/p4est','https://github.com/cburstedde/p4est/archive/'+self.gitcommit+'.tar.gz']
     self.versionname       = 'P4EST_VERSION_MAJOR.P4EST_VERSION_MINOR.P4EST_VERSION_POINT'
     self.versioninclude    = 'p4est_config.h'

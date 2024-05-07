@@ -18,16 +18,50 @@ static PetscErrorCode DMTSConvertPlex(DM dm, DM *plex, PetscBool copy)
     if (!*plex) {
       PetscCall(DMConvert(dm, DMPLEX, plex));
       PetscCall(PetscObjectCompose((PetscObject)dm, "dm_plex", (PetscObject)*plex));
-      if (copy) {
-        PetscCall(DMCopyDMTS(dm, *plex));
-        PetscCall(DMCopyDMSNES(dm, *plex));
-        PetscCall(DMCopyAuxiliaryVec(dm, *plex));
-      }
     } else {
       PetscCall(PetscObjectReference((PetscObject)*plex));
     }
+    if (copy) {
+      PetscCall(DMCopyDMTS(dm, *plex));
+      PetscCall(DMCopyDMSNES(dm, *plex));
+      PetscCall(DMCopyAuxiliaryVec(dm, *plex));
+    }
   }
   PetscFunctionReturn(PETSC_SUCCESS);
+}
+
+PetscErrorCode DMPlexTSComputeRHSFunctionFVMCEED(DM dm, PetscReal time, Vec locX, Vec F, void *user)
+{
+#ifdef PETSC_HAVE_LIBCEED
+  PetscFV    fv;
+  Vec        locF;
+  Ceed       ceed;
+  DMCeed     sd = dm->dmceed;
+  CeedVector clocX, clocF;
+#endif
+
+#ifdef PETSC_HAVE_LIBCEED
+  PetscFunctionBegin;
+  PetscCall(DMGetCeed(dm, &ceed));
+  PetscCheck(sd, PetscObjectComm((PetscObject)dm), PETSC_ERR_ARG_WRONGSTATE, "This DM has no CEED data. Call DMCeedCreate() before computing the residual.");
+  if (time == 0.) PetscCall(DMCeedComputeGeometry(dm, sd));
+  PetscCall(DMGetField(dm, 0, NULL, (PetscObject *)&fv));
+  PetscCall(DMPlexInsertBoundaryValuesFVM(dm, fv, locX, time, NULL));
+  PetscCall(DMGetLocalVector(dm, &locF));
+  PetscCall(VecZeroEntries(locF));
+  PetscCall(VecGetCeedVectorRead(locX, ceed, &clocX));
+  PetscCall(VecGetCeedVector(locF, ceed, &clocF));
+  PetscCallCEED(CeedOperatorApplyAdd(sd->op, clocX, clocF, CEED_REQUEST_IMMEDIATE));
+  PetscCall(VecRestoreCeedVectorRead(locX, &clocX));
+  PetscCall(VecRestoreCeedVector(locF, &clocF));
+  PetscCall(DMLocalToGlobalBegin(dm, locF, ADD_VALUES, F));
+  PetscCall(DMLocalToGlobalEnd(dm, locF, ADD_VALUES, F));
+  PetscCall(DMRestoreLocalVector(dm, &locF));
+  PetscCall(VecViewFromOptions(F, NULL, "-fv_rhs_view"));
+  PetscFunctionReturn(PETSC_SUCCESS);
+#else
+  SETERRQ(PetscObjectComm((PetscObject)dm), PETSC_ERR_SUP, "This requires libCEED. Reconfigure using --download-libceed");
+#endif
 }
 
 /*@
@@ -67,6 +101,7 @@ PetscErrorCode DMPlexTSComputeRHSFunctionFVM(DM dm, PetscReal time, Vec locX, Ve
   PetscCall(DMRestoreLocalVector(plex, &locF));
   PetscCall(ISDestroy(&cellIS));
   PetscCall(DMDestroy(&plex));
+  PetscCall(VecViewFromOptions(F, NULL, "-fv_rhs_view"));
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
@@ -420,8 +455,7 @@ PetscErrorCode DMTSCheckJacobian(TS ts, DM dm, PetscReal t, Vec u, Vec u_t, Pets
     PetscCall(VecDuplicate(u, &r));
     PetscCall(TSComputeIFunction(ts, t, u, u_t, r, PETSC_FALSE));
     /* Look at the convergence of our Taylor approximation as we approach u */
-    for (h = hMax, Nv = 0; h >= hMin; h *= hMult, ++Nv)
-      ;
+    for (h = hMax, Nv = 0; h >= hMin; h *= hMult, ++Nv);
     PetscCall(PetscCalloc3(Nv, &es, Nv, &hs, Nv, &errors));
     PetscCall(VecDuplicate(u, &uhat));
     PetscCall(VecDuplicate(u, &uhat_t));

@@ -144,6 +144,19 @@ int main(int argc, char **args)
     PetscCall(PetscPrintf(PETSC_COMM_WORLD, "C MatMatTransposeMult C:\n"));
     PetscCall(MatView(B, PETSC_VIEWER_STDOUT_WORLD));
   }
+  PetscCall(MatDestroy(&B));
+
+  /* Test MatTransposeMatMult(): B = C^T*C */
+  PetscCall(MatTransposeMatMult(C, C, MAT_INITIAL_MATRIX, PETSC_DEFAULT, &B));
+  PetscCall(MatScale(C, 2.0));
+  PetscCall(MatTransposeMatMult(C, C, MAT_REUSE_MATRIX, PETSC_DEFAULT, &B));
+  PetscCall(MatTransposeMatMultEqual(C, C, B, 10, &flg));
+  PetscCheck(flg, PETSC_COMM_WORLD, PETSC_ERR_PLIB, "Check fails: B != C^T*C");
+
+  if (mats_view) {
+    PetscCall(PetscPrintf(PETSC_COMM_WORLD, "C MatTransposeMatMult C:\n"));
+    PetscCall(MatView(B, PETSC_VIEWER_STDOUT_WORLD));
+  }
 
   /* Test MatMult() */
   PetscCall(MatComputeOperator(C, MATAIJ, &Caij));
@@ -204,22 +217,22 @@ int main(int argc, char **args)
       requires: scalapack
 
    test:
+      requires: !single # garbage prints in single precision from sgemr2d
       nsize: 2
       args: -mb 5 -nb 5 -M 12 -N 10
-      requires: scalapack
 
    test:
+      requires: !single # garbage prints in single precision from sgemr2d
       suffix: 2
       nsize: 6
       args: -mb 8 -nb 6 -M 20 -N 50
-      requires: scalapack
       output_file: output/ex242_1.out
 
    test:
+      requires: !single # garbage prints in single precision from sgemr2d
       suffix: 3
       nsize: 3
       args: -mb 2 -nb 2 -M 20 -N 20 -test_matmatmult
-      requires: scalapack
       output_file: output/ex242_1.out
 
 TEST*/

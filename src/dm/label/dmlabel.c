@@ -92,8 +92,8 @@ static PetscErrorCode DMLabelMakeValid_Private(DMLabel label, PetscInt v)
   IS       is;
   PetscInt off = 0, *pointArray, p;
 
-  if ((PetscLikely(v >= 0 && v < label->numStrata) && label->validIS[v]) || label->readonly) return PETSC_SUCCESS;
   PetscFunctionBegin;
+  if ((PetscLikely(v >= 0 && v < label->numStrata) && label->validIS[v]) || label->readonly) PetscFunctionReturn(PETSC_SUCCESS);
   PetscCheck(v >= 0 && v < label->numStrata, PETSC_COMM_SELF, PETSC_ERR_ARG_WRONG, "Trying to access invalid stratum %" PetscInt_FMT " in DMLabelMakeValid_Private", v);
   PetscCall(PetscHSetIGetSize(label->ht[v], &label->stratumSizes[v]));
   PetscCall(PetscMalloc1(label->stratumSizes[v], &pointArray));
@@ -165,14 +165,14 @@ static PetscErrorCode DMLabelMakeInvalid_Private(DMLabel label, PetscInt v)
   PetscInt        p;
   const PetscInt *points;
 
-  if ((PetscLikely(v >= 0 && v < label->numStrata) && !label->validIS[v]) || label->readonly) return PETSC_SUCCESS;
   PetscFunctionBegin;
+  if ((PetscLikely(v >= 0 && v < label->numStrata) && !label->validIS[v]) || label->readonly) PetscFunctionReturn(PETSC_SUCCESS);
   PetscCheck(v >= 0 && v < label->numStrata, PETSC_COMM_SELF, PETSC_ERR_ARG_WRONG, "Trying to access invalid stratum %" PetscInt_FMT " in DMLabelMakeInvalid_Private", v);
   if (label->points[v]) {
     PetscCall(ISGetIndices(label->points[v], &points));
     for (p = 0; p < label->stratumSizes[v]; ++p) PetscCall(PetscHSetIAdd(label->ht[v], points[p]));
     PetscCall(ISRestoreIndices(label->points[v], &points));
-    PetscCall(ISDestroy(&(label->points[v])));
+    PetscCall(ISDestroy(&label->points[v]));
   }
   label->validIS[v] = PETSC_FALSE;
   PetscFunctionReturn(PETSC_SUCCESS);
@@ -529,8 +529,8 @@ PetscErrorCode DMLabelDestroy(DMLabel *label)
 {
   PetscFunctionBegin;
   if (!*label) PetscFunctionReturn(PETSC_SUCCESS);
-  PetscValidHeaderSpecific((*label), DMLABEL_CLASSID, 1);
-  if (--((PetscObject)(*label))->refct > 0) {
+  PetscValidHeaderSpecific(*label, DMLABEL_CLASSID, 1);
+  if (--((PetscObject)*label)->refct > 0) {
     *label = NULL;
     PetscFunctionReturn(PETSC_SUCCESS);
   }
@@ -545,7 +545,7 @@ static PetscErrorCode DMLabelDuplicate_Concrete(DMLabel label, DMLabel *labelnew
   PetscFunctionBegin;
   for (PetscInt v = 0; v < label->numStrata; ++v) {
     PetscCall(PetscHSetICreate(&(*labelnew)->ht[v]));
-    PetscCall(PetscObjectReference((PetscObject)(label->points[v])));
+    PetscCall(PetscObjectReference((PetscObject)label->points[v]));
     (*labelnew)->points[v] = label->points[v];
   }
   PetscCall(PetscHMapIDestroy(&(*labelnew)->hmap));
@@ -627,6 +627,9 @@ PetscErrorCode DMLabelDuplicate(DMLabel label, DMLabel *labelnew)
   For the comparison, we ignore the order of stratum values, and strata with no points.
 
   The communicator needs to be specified because currently `DMLabel` can live on `PETSC_COMM_SELF` even if the underlying `DM` is parallel.
+
+  Developer Note:
+  Fortran stub cannot be generated automatically because `message` must be freed with `PetscFree()`
 
 .seealso: `DMLabel`, `DM`, `DMCompareLabels()`, `DMLabelGetNumValues()`, `DMLabelGetDefaultValue()`, `DMLabelGetNonEmptyStratumValuesIS()`, `DMLabelGetStratumIS()`
 @*/
@@ -1455,9 +1458,9 @@ PetscErrorCode DMLabelSetStratumIS(DMLabel label, PetscInt value, IS is)
   PetscCall(DMLabelLookupAddStratum(label, value, &v));
   if (is == label->points[v]) PetscFunctionReturn(PETSC_SUCCESS);
   PetscCall(DMLabelClearStratum(label, value));
-  PetscCall(ISGetLocalSize(is, &(label->stratumSizes[v])));
+  PetscCall(ISGetLocalSize(is, &label->stratumSizes[v]));
   PetscCall(PetscObjectReference((PetscObject)is));
-  PetscCall(ISDestroy(&(label->points[v])));
+  PetscCall(ISDestroy(&label->points[v]));
   label->points[v]  = is;
   label->validIS[v] = PETSC_TRUE;
   PetscCall(PetscObjectStateIncrease((PetscObject)label));
@@ -1834,7 +1837,7 @@ PetscErrorCode DMLabelDistribute(DMLabel label, PetscSF sf, DMLabel *labelNew)
   PetscCall(PetscCalloc1((*labelNew)->numStrata, &points));
   for (s = 0; s < (*labelNew)->numStrata; ++s) {
     PetscCall(PetscHSetICreate(&(*labelNew)->ht[s]));
-    PetscCall(PetscMalloc1((*labelNew)->stratumSizes[s], &(points[s])));
+    PetscCall(PetscMalloc1((*labelNew)->stratumSizes[s], &points[s]));
   }
   /* Insert points into new strata */
   PetscCall(PetscCalloc1((*labelNew)->numStrata, &strataIdx));
@@ -1848,7 +1851,7 @@ PetscErrorCode DMLabelDistribute(DMLabel label, PetscSF sf, DMLabel *labelNew)
     }
   }
   for (s = 0; s < (*labelNew)->numStrata; s++) {
-    PetscCall(ISCreateGeneral(PETSC_COMM_SELF, (*labelNew)->stratumSizes[s], &(points[s][0]), PETSC_OWN_POINTER, &((*labelNew)->points[s])));
+    PetscCall(ISCreateGeneral(PETSC_COMM_SELF, (*labelNew)->stratumSizes[s], &points[s][0], PETSC_OWN_POINTER, &((*labelNew)->points[s])));
     PetscCall(PetscObjectSetName((PetscObject)((*labelNew)->points[s]), "indices"));
   }
   PetscCall(PetscFree(points));
@@ -2652,11 +2655,11 @@ PetscErrorCode PetscSectionSymLabelGetStratum(PetscSectionSym sym, PetscInt stra
   }
   if (perms) {
     PetscAssertPointer(perms, 6);
-    *perms = sl->perms[i] ? &sl->perms[i][sl->minMaxOrients[i][0]] : NULL;
+    *perms = PetscSafePointerPlusOffset(sl->perms[i], sl->minMaxOrients[i][0]);
   }
   if (rots) {
     PetscAssertPointer(rots, 7);
-    *rots = sl->rots[i] ? &sl->rots[i][sl->minMaxOrients[i][0]] : NULL;
+    *rots = PetscSafePointerPlusOffset(sl->rots[i], sl->minMaxOrients[i][0]);
   }
   PetscFunctionReturn(PETSC_SUCCESS);
 }
@@ -2727,8 +2730,8 @@ PetscErrorCode PetscSectionSymLabelSetStratum(PetscSectionSym sym, PetscInt stra
       sl->rots[i] = (const PetscScalar **)&ownRots[-minOrient];
     }
   } else {
-    sl->perms[i] = perms ? &perms[-minOrient] : NULL;
-    sl->rots[i]  = rots ? &rots[-minOrient] : NULL;
+    sl->perms[i] = PetscSafePointerPlusOffset(perms, -minOrient);
+    sl->rots[i]  = PetscSafePointerPlusOffset(rots, -minOrient);
   }
   PetscFunctionReturn(PETSC_SUCCESS);
 }

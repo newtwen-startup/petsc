@@ -21,7 +21,7 @@ static int sort_CompareSwarmPoint(const void *dataA, const void *dataB)
 static PetscErrorCode DMSwarmSortApplyCellIndexSort(DMSwarmSort ctx)
 {
   PetscFunctionBegin;
-  qsort(ctx->list, ctx->npoints, sizeof(SwarmPoint), sort_CompareSwarmPoint);
+  if (ctx->list) qsort(ctx->list, ctx->npoints, sizeof(SwarmPoint), sort_CompareSwarmPoint);
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
@@ -112,9 +112,11 @@ PetscErrorCode DMSwarmSortDestroy(DMSwarmSort *_ctx)
   Not Collective
 
   Input Parameters:
-+ dm      - a `DMSWARM` objects
-. e       - the index of the cell
-- npoints - the number of points in the cell
++ dm - a `DMSWARM` objects
+- e  - the index of the cell
+
+  Output Parameter:
+. npoints - the number of points in the cell
 
   Level: advanced
 
@@ -180,7 +182,6 @@ PETSC_EXTERN PetscErrorCode DMSwarmSortGetPointsPerCell(DM dm, PetscInt e, Petsc
   }
   *npoints = points_per_cell;
   *pidlist = plist;
-
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 

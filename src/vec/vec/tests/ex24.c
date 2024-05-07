@@ -55,12 +55,9 @@ int main(int argc, char **argv)
   PetscCall(VecScatterEnd(ctx, x, y, INSERT_VALUES, SCATTER_FORWARD));
 
   PetscCall(PetscViewerASCIIPushSynchronized(PETSC_VIEWER_STDOUT_WORLD));
-  PetscCall(PetscViewerASCIISynchronizedPrintf(PETSC_VIEWER_STDOUT_WORLD, "----\n"));
   PetscCall(PetscViewerGetSubViewer(PETSC_VIEWER_STDOUT_WORLD, PETSC_COMM_SELF, &sviewer));
   PetscCall(VecView(y, sviewer));
-  PetscCall(PetscFFlush(PETSC_STDOUT));
   PetscCall(PetscViewerRestoreSubViewer(PETSC_VIEWER_STDOUT_WORLD, PETSC_COMM_SELF, &sviewer));
-  PetscCall(PetscViewerFlush(PETSC_VIEWER_STDOUT_WORLD));
   PetscCall(PetscViewerASCIIPopSynchronized(PETSC_VIEWER_STDOUT_WORLD));
 
   PetscCall(VecScatterDestroy(&ctx));
@@ -89,7 +86,7 @@ int main(int argc, char **argv)
         args: -vec_type cuda
       test:
         requires: viennacl
-        suffix:  viennacl
+        suffix: viennacl
         args: -vec_type viennacl
 
 TEST*/

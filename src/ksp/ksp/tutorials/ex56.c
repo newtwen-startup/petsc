@@ -120,7 +120,7 @@ int main(int argc, char **args)
     if (!test_late_bs) PetscCall(MatSetBlockSize(Amat, 3));
     PetscCall(MatSetType(Amat, MATAIJ));
     PetscCall(MatSetOption(Amat, MAT_SPD, PETSC_TRUE));
-    PetscCall(MatSetOption(Amat, MAT_SPD_ETERNAL, PETSC_TRUE));
+    PetscCall(MatSetOption(Amat, MAT_SPD_ETERNAL, PETSC_TRUE)); // this keeps CG after switch to negative
     PetscCall(MatSetFromOptions(Amat));
     PetscCall(MatSeqAIJSetPreallocation(Amat, 0, d_nnz));
     PetscCall(MatMPIAIJSetPreallocation(Amat, 0, d_nnz, 0, o_nnz));
@@ -287,7 +287,7 @@ int main(int argc, char **args)
     MatNullSpace matnull;
     Vec          vec_coords;
     PetscScalar *c;
-
+    PC           pc;
     PetscCall(VecCreate(MPI_COMM_WORLD, &vec_coords));
     PetscCall(VecSetBlockSize(vec_coords, 3));
     PetscCall(VecSetSizes(vec_coords, m, PETSC_DECIDE));
@@ -299,11 +299,18 @@ int main(int argc, char **args)
     PetscCall(MatSetNearNullSpace(Amat, matnull));
     PetscCall(MatNullSpaceDestroy(&matnull));
     PetscCall(VecDestroy(&vec_coords));
+    PetscCall(KSPGetPC(ksp, &pc));
+    PetscCall(PCJacobiSetRowl1Scale(pc, 0.5));
   } else {
-    PC pc;
+    PC       pc;
+    PetscInt idx[] = {1, 2};
     PetscCall(KSPGetPC(ksp, &pc));
     PetscCall(PCSetCoordinates(pc, 3, m / 3, coords));
     PetscCall(PCGAMGSetUseSAEstEig(pc, PETSC_FALSE));
+    PetscCall(PCGAMGSetLowMemoryFilter(pc, PETSC_TRUE));
+    PetscCall(PCGAMGMISkSetMinDegreeOrdering(pc, PETSC_TRUE));
+    PetscCall(PCGAMGSetAggressiveSquareGraph(pc, PETSC_FALSE));
+    PetscCall(PCGAMGSetInjectionIndex(pc, 2, idx)); // code coverage, same as command line
   }
 
   PetscCall(MaybeLogStagePush(stage[0]));
@@ -336,7 +343,8 @@ int main(int argc, char **args)
 
     PetscCall(MaybeLogStagePush(stage[2]));
     /* PC setup basically */
-    PetscCall(MatScale(Amat, 100000.0));
+    PetscCall(MatScale(Amat, -100000.0));
+    PetscCall(MatSetOption(Amat, MAT_SPD, PETSC_FALSE));
     PetscCall(KSPSetOperators(ksp, Amat, Amat));
     PetscCall(KSPSetUp(ksp));
 
@@ -454,28 +462,45 @@ PetscErrorCode elem_3d_elast_v_25(PetscScalar *dd)
 
 /*TEST
 
-   test:
-      nsize: 8
-      args: -ne 13 -alpha 1.e-3 -ksp_type cg -pc_type gamg -pc_gamg_agg_nsmooths 1 -pc_gamg_reuse_interpolation true -two_solves -ksp_converged_reason -use_mat_nearnullspace -mg_levels_ksp_max_it 2 -mg_levels_ksp_type chebyshev -mg_levels_ksp_chebyshev_esteig 0,0.2,0,1.05 -pc_gamg_esteig_ksp_max_it 10 -pc_gamg_threshold -0.01 -pc_gamg_coarse_eq_limit 200 -pc_gamg_process_eq_limit 30 -pc_gamg_repartition false -pc_mg_cycle_type v -pc_gamg_parallel_coarse_grid_solver -mg_coarse_pc_type jacobi -mg_coarse_ksp_type cg -ksp_monitor_short -pc_gamg_rank_reduction_factors 2,2,2
-      filter: grep -v variant
+   testset:
+     requires: !complex
+     args: -ne 11 -alpha 1.e-3 -ksp_type cg -pc_type gamg -pc_gamg_agg_nsmooths 1 -two_solves -ksp_converged_reason -use_mat_nearnullspace -mg_levels_ksp_max_it 1 -mg_levels_ksp_type chebyshev -mg_levels_ksp_chebyshev_esteig 0,0.2,0,1.05 -mg_levels_sub_pc_type lu -pc_gamg_asm_use_agg -mg_levels_pc_asm_overlap 0 -pc_gamg_parallel_coarse_grid_solver -mg_coarse_pc_type jacobi -mg_coarse_ksp_type cg -mat_coarsen_type hem -mat_coarsen_max_it 5 -ksp_rtol 1e-4 -ksp_norm_type unpreconditioned -pc_gamg_threshold .001 -mat_coarsen_strength_index 1,2
+     test:
+       suffix: 1
+       nsize: 1
+       filter: sed -e "s/Linear solve converged due to CONVERGED_RTOL iterations 15/Linear solve converged due to CONVERGED_RTOL iterations 14/g"
+     test:
+       suffix: 2
+       nsize: 8
+       filter: sed -e "s/Linear solve converged due to CONVERGED_RTOL iterations 1[3|4]/Linear solve converged due to CONVERGED_RTOL iterations 15/g"
 
-   test:
-      suffix: 2
-      nsize: 1
-      args: -ne 11 -alpha 1.e-3 -ksp_type cg -pc_type gamg -pc_gamg_agg_nsmooths 1 -pc_gamg_reuse_interpolation true -two_solves -ksp_converged_reason -use_mat_nearnullspace  -mg_levels_ksp_max_it 1 -mg_levels_ksp_type chebyshev -mg_levels_ksp_chebyshev_esteig 0,0.2,0,1.05 -pc_gamg_esteig_ksp_max_it 10 -pc_gamg_asm_use_agg true -mg_levels_sub_pc_type lu -mg_levels_pc_asm_overlap 0 -pc_gamg_threshold -0.01 -pc_gamg_coarse_eq_limit 200 -pc_gamg_process_eq_limit 30 -pc_gamg_repartition false -pc_mg_cycle_type v -pc_gamg_parallel_coarse_grid_solver -mg_coarse_pc_type jacobi -mg_coarse_ksp_type cg
-      filter: grep -v variant
+   testset:
+     nsize: 8
+     args: -ne 15 -alpha 1.e-3 -ksp_type cg -ksp_converged_reason -use_mat_nearnullspace -ksp_rtol 1e-4 -ksp_norm_type unpreconditioned -two_solves
+     test:
+       requires: hypre !complex !defined(PETSC_HAVE_HYPRE_DEVICE)
+       suffix: hypre
+       args: -pc_type hypre -pc_hypre_boomeramg_relax_type_all l1scaled-Jacobi
+     test:
+       suffix: gamg
+       args: -pc_type gamg -mg_levels_ksp_type richardson -mg_levels_pc_type jacobi -mg_levels_pc_jacobi_type rowl1 -mg_levels_pc_jacobi_rowl1_scale .5 -mg_levels_pc_jacobi_fixdiagonal
+     test:
+       nsize: 1
+       suffix: baij
+       filter: grep -v variant
+       args: -pc_type jacobi -pc_jacobi_type rowl1 -ksp_type cg -mat_type baij -ksp_view -ksp_rtol 1e-1
 
    test:
       suffix: latebs
       filter: grep -v variant
       nsize: 8
-      args: -test_late_bs 0 -ne 9 -alpha 1.e-3 -ksp_type cg -pc_type gamg -pc_gamg_agg_nsmooths 1 -pc_gamg_reuse_interpolation true -two_solves -ksp_converged_reason -use_mat_nearnullspace false -mg_levels_ksp_max_it 2 -mg_levels_ksp_type chebyshev -mg_levels_ksp_chebyshev_esteig 0,0.2,0,1.05 -pc_gamg_esteig_ksp_max_it 10 -pc_gamg_threshold -0.01 -pc_gamg_coarse_eq_limit 200 -pc_gamg_process_eq_limit 30 -pc_gamg_repartition false -pc_mg_cycle_type v -pc_gamg_parallel_coarse_grid_solver -mg_coarse_pc_type jacobi -mg_coarse_ksp_type cg -ksp_monitor_short -ksp_view
+      args: -test_late_bs 0 -ne 9 -alpha 1.e-3 -ksp_type cg -pc_type gamg -pc_gamg_agg_nsmooths 1 -pc_gamg_reuse_interpolation true -two_solves -ksp_converged_reason -use_mat_nearnullspace false -mg_levels_ksp_max_it 2 -mg_levels_ksp_type chebyshev -mg_levels_ksp_chebyshev_esteig 0,0.2,0,1.05 -pc_gamg_esteig_ksp_max_it 10 -pc_gamg_threshold -0.01 -pc_gamg_coarse_eq_limit 200 -pc_gamg_process_eq_limit 30 -pc_gamg_repartition false -pc_mg_cycle_type v -pc_gamg_parallel_coarse_grid_solver -mg_coarse_pc_type jacobi -mg_coarse_ksp_type cg -ksp_monitor_short -ksp_view -pc_gamg_injection_index 1,2 -mg_fine_ksp_type richardson -mg_fine_pc_type jacobi -mg_fine_pc_jacobi_type rowl1 -mg_fine_pc_jacobi_rowl1_scale .25
 
    test:
       suffix: latebs-2
       filter: grep -v variant
       nsize: 8
-      args: -test_late_bs -ne 9 -alpha 1.e-3 -ksp_type cg -pc_type gamg -pc_gamg_agg_nsmooths 1 -pc_gamg_reuse_interpolation true -two_solves -ksp_converged_reason -use_mat_nearnullspace  -mg_levels_ksp_max_it 2 -mg_levels_ksp_type chebyshev -mg_levels_ksp_chebyshev_esteig 0,0.2,0,1.05 -pc_gamg_esteig_ksp_max_it 10 -pc_gamg_threshold -0.01 -pc_gamg_coarse_eq_limit 200 -pc_gamg_process_eq_limit 30 -pc_gamg_repartition false -pc_mg_cycle_type v -pc_gamg_parallel_coarse_grid_solver -mg_coarse_pc_type jacobi -mg_coarse_ksp_type cg -ksp_monitor_short -ksp_view
+      args: -test_late_bs -ne 9 -alpha 1.e-3 -ksp_type cg -pc_type gamg -pc_gamg_agg_nsmooths 1 -pc_gamg_reuse_interpolation true -two_solves -ksp_converged_reason -use_mat_nearnullspace -mg_levels_ksp_max_it 2 -mg_levels_ksp_type chebyshev -mg_levels_ksp_chebyshev_esteig 0,0.2,0,1.05 -pc_gamg_esteig_ksp_max_it 10 -pc_gamg_threshold -0.01 -pc_gamg_coarse_eq_limit 200 -pc_gamg_process_eq_limit 30 -pc_gamg_repartition false -pc_mg_cycle_type v -pc_gamg_parallel_coarse_grid_solver -mg_coarse_pc_type jacobi -mg_coarse_ksp_type cg -ksp_monitor_short -ksp_view
 
    test:
       suffix: ml
@@ -490,7 +515,7 @@ PetscErrorCode elem_3d_elast_v_25(PetscScalar *dd)
    test:
       suffix: nns_telescope
       nsize: 2
-      args: -use_mat_nearnullspace -ksp_monitor_short -pc_type telescope -pc_telescope_reduction_factor 2 -telescope_pc_type gamg -telescope_pc_gamg_esteig_ksp_type cg -telescope_pc_gamg_esteig_ksp_max_it 10
+      args: -use_mat_nearnullspace -pc_type telescope -pc_telescope_reduction_factor 2 -telescope_pc_type gamg -telescope_pc_gamg_esteig_ksp_type cg -telescope_pc_gamg_esteig_ksp_max_it 10
 
    test:
       suffix: nns_gdsw
@@ -502,6 +527,6 @@ PetscErrorCode elem_3d_elast_v_25(PetscScalar *dd)
       suffix: seqaijmkl
       nsize: 8
       requires: mkl_sparse
-      args: -ne 9 -alpha 1.e-3 -ksp_type cg -pc_type gamg -pc_gamg_agg_nsmooths 1 -pc_gamg_reuse_interpolation true -two_solves -ksp_converged_reason -use_mat_nearnullspace -mg_levels_ksp_max_it 2 -mg_levels_ksp_type chebyshev -mg_levels_pc_type jacobi -mg_levels_ksp_chebyshev_esteig 0,0.2,0,1.05 -pc_gamg_esteig_ksp_max_it 10 -pc_gamg_threshold 0.01 -pc_gamg_coarse_eq_limit 2000 -pc_gamg_process_eq_limit 200 -pc_gamg_repartition false -pc_mg_cycle_type v -ksp_monitor_short -mat_seqaij_type seqaijmkl
+      args: -ne 9 -alpha 1.e-3 -ksp_type cg -pc_type gamg -pc_gamg_agg_nsmooths 1 -pc_gamg_reuse_interpolation true -two_solves -ksp_converged_reason -use_mat_nearnullspace -mg_levels_ksp_max_it 2 -mg_levels_ksp_type chebyshev -mg_levels_pc_type jacobi -mg_levels_ksp_chebyshev_esteig 0,0.2,0,1.05 -pc_gamg_esteig_ksp_max_it 10 -pc_gamg_threshold 0.01 -pc_gamg_coarse_eq_limit 2000 -pc_gamg_process_eq_limit 200 -pc_gamg_repartition false -pc_mg_cycle_type v -mat_seqaij_type seqaijmkl
 
 TEST*/

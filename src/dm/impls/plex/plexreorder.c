@@ -51,7 +51,7 @@ static PetscErrorCode DMPlexCreateOrderingClosure_Static(DM dm, PetscInt numPoin
   Collective
 
   Input Parameters:
-+ dm    - The DMPlex object
++ dm    - The `DMPLEX` object
 . otype - type of reordering, see `MatOrderingType`
 - label - [Optional] Label used to segregate ordering into sets, or `NULL`
 
@@ -366,7 +366,7 @@ PetscErrorCode DMPlexPermute(DM dm, IS perm, DM *pdm)
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
-PetscErrorCode DMPlexReorderSetDefault_Plex(DM dm, DMPlexReorderDefaultFlag reorder)
+PetscErrorCode DMPlexReorderSetDefault_Plex(DM dm, DMReorderDefaultFlag reorder)
 {
   DM_Plex *mesh = (DM_Plex *)dm->data;
 
@@ -388,15 +388,15 @@ PetscErrorCode DMPlexReorderSetDefault_Plex(DM dm, DMPlexReorderDefaultFlag reor
 
 .seealso: `DMPlexReorderGetDefault()`
 @*/
-PetscErrorCode DMPlexReorderSetDefault(DM dm, DMPlexReorderDefaultFlag reorder)
+PetscErrorCode DMPlexReorderSetDefault(DM dm, DMReorderDefaultFlag reorder)
 {
   PetscFunctionBegin;
   PetscValidHeaderSpecific(dm, DM_CLASSID, 1);
-  PetscTryMethod(dm, "DMPlexReorderSetDefault_C", (DM, DMPlexReorderDefaultFlag), (dm, reorder));
+  PetscTryMethod(dm, "DMPlexReorderSetDefault_C", (DM, DMReorderDefaultFlag), (dm, reorder));
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
-PetscErrorCode DMPlexReorderGetDefault_Plex(DM dm, DMPlexReorderDefaultFlag *reorder)
+PetscErrorCode DMPlexReorderGetDefault_Plex(DM dm, DMReorderDefaultFlag *reorder)
 {
   DM_Plex *mesh = (DM_Plex *)dm->data;
 
@@ -420,11 +420,173 @@ PetscErrorCode DMPlexReorderGetDefault_Plex(DM dm, DMPlexReorderDefaultFlag *reo
 
 .seealso: `DMPlexReorderSetDefault()`
 @*/
-PetscErrorCode DMPlexReorderGetDefault(DM dm, DMPlexReorderDefaultFlag *reorder)
+PetscErrorCode DMPlexReorderGetDefault(DM dm, DMReorderDefaultFlag *reorder)
 {
   PetscFunctionBegin;
   PetscValidHeaderSpecific(dm, DM_CLASSID, 1);
   PetscAssertPointer(reorder, 2);
-  PetscUseMethod(dm, "DMPlexReorderGetDefault_C", (DM, DMPlexReorderDefaultFlag *), (dm, reorder));
+  PetscUseMethod(dm, "DMPlexReorderGetDefault_C", (DM, DMReorderDefaultFlag *), (dm, reorder));
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
+static PetscErrorCode DMCreateSectionPermutation_Plex_Reverse(DM dm, IS *permutation, PetscBT *blockStarts)
+{
+  IS        permIS;
+  PetscInt *perm;
+  PetscInt  pStart, pEnd;
+
+  PetscFunctionBegin;
+  PetscCall(DMPlexGetChart(dm, &pStart, &pEnd));
+  PetscCall(PetscMalloc1(pEnd - pStart, &perm));
+  for (PetscInt p = pStart; p < pEnd; ++p) perm[pEnd - 1 - p] = p;
+  PetscCall(ISCreateGeneral(PETSC_COMM_SELF, pEnd - pStart, perm, PETSC_OWN_POINTER, &permIS));
+  PetscCall(ISSetPermutation(permIS));
+  *permutation = permIS;
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
+// Reorder to group split nodes
+static PetscErrorCode DMCreateSectionPermutation_Plex_Cohesive(DM dm, IS *permutation, PetscBT *blockStarts)
+{
+  IS        permIS;
+  PetscBT   bt, blst;
+  PetscInt *perm;
+  PetscInt  pStart, pEnd, i = 0;
+
+  PetscFunctionBegin;
+  PetscCall(DMPlexGetChart(dm, &pStart, &pEnd));
+  PetscCall(PetscMalloc1(pEnd - pStart, &perm));
+  PetscCall(PetscBTCreate(pEnd - pStart, &bt));
+  PetscCall(PetscBTCreate(pEnd - pStart, &blst));
+  for (PetscInt p = pStart; p < pEnd; ++p) {
+    const PetscInt *supp, *cone;
+    PetscInt        suppSize;
+    DMPolytopeType  ct;
+
+    PetscCall(DMPlexGetCellType(dm, p, &ct));
+    // Do not order tensor cells until they appear below
+    if (ct == DM_POLYTOPE_POINT_PRISM_TENSOR || ct == DM_POLYTOPE_SEG_PRISM_TENSOR || ct == DM_POLYTOPE_TRI_PRISM_TENSOR || ct == DM_POLYTOPE_QUAD_PRISM_TENSOR) continue;
+    if (PetscBTLookupSet(bt, p)) continue;
+    PetscCall(PetscBTSet(blst, p));
+    perm[i++] = p;
+    // Check for tensor cells in the support
+    PetscCall(DMPlexGetSupport(dm, p, &supp));
+    PetscCall(DMPlexGetSupportSize(dm, p, &suppSize));
+    for (PetscInt s = 0; s < suppSize; ++s) {
+      DMPolytopeType sct;
+      PetscInt       q, qq;
+
+      PetscCall(DMPlexGetCellType(dm, supp[s], &sct));
+      switch (sct) {
+      case DM_POLYTOPE_POINT_PRISM_TENSOR:
+      case DM_POLYTOPE_SEG_PRISM_TENSOR:
+      case DM_POLYTOPE_TRI_PRISM_TENSOR:
+      case DM_POLYTOPE_QUAD_PRISM_TENSOR:
+        // If found, move up the split partner of the tensor cell, and the cell itself
+        PetscCall(DMPlexGetCone(dm, supp[s], &cone));
+        qq = supp[s];
+        q  = (cone[0] == p) ? cone[1] : cone[0];
+        if (!PetscBTLookupSet(bt, q)) {
+          perm[i++] = q;
+          s         = suppSize;
+          // At T-junctions, we can have an unsplit point at the other end, so also order that loop
+          {
+            const PetscInt *qsupp, *qcone;
+            PetscInt        qsuppSize;
+
+            PetscCall(DMPlexGetSupport(dm, q, &qsupp));
+            PetscCall(DMPlexGetSupportSize(dm, q, &qsuppSize));
+            for (PetscInt qs = 0; qs < qsuppSize; ++qs) {
+              DMPolytopeType qsct;
+
+              PetscCall(DMPlexGetCellType(dm, qsupp[qs], &qsct));
+              switch (qsct) {
+              case DM_POLYTOPE_POINT_PRISM_TENSOR:
+              case DM_POLYTOPE_SEG_PRISM_TENSOR:
+              case DM_POLYTOPE_TRI_PRISM_TENSOR:
+              case DM_POLYTOPE_QUAD_PRISM_TENSOR:
+                PetscCall(DMPlexGetCone(dm, qsupp[qs], &qcone));
+                if (qcone[0] == qcone[1]) {
+                  if (!PetscBTLookupSet(bt, qsupp[qs])) {
+                    perm[i++] = qsupp[qs];
+                    qs        = qsuppSize;
+                  }
+                }
+                break;
+              default:
+                break;
+              }
+            }
+          }
+        }
+        if (!PetscBTLookupSet(bt, qq)) {
+          perm[i++] = qq;
+          s         = suppSize;
+        }
+        break;
+      default:
+        break;
+      }
+    }
+  }
+  if (PetscDefined(USE_DEBUG)) {
+    for (PetscInt p = pStart; p < pEnd; ++p) PetscCheck(PetscBTLookup(bt, p), PETSC_COMM_SELF, PETSC_ERR_PLIB, "Index %" PetscInt_FMT " missed in permutation of [%" PetscInt_FMT ", %" PetscInt_FMT ")", p, pStart, pEnd);
+  }
+  PetscCall(PetscBTDestroy(&bt));
+  PetscCheck(i == pEnd - pStart, PETSC_COMM_SELF, PETSC_ERR_ARG_INCOMP, "Number of points in permutation %" PetscInt_FMT " does not match chart size %" PetscInt_FMT, i, pEnd - pStart);
+  PetscCall(ISCreateGeneral(PETSC_COMM_SELF, pEnd - pStart, perm, PETSC_OWN_POINTER, &permIS));
+  PetscCall(ISSetPermutation(permIS));
+  *permutation = permIS;
+  *blockStarts = blst;
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
+PetscErrorCode DMCreateSectionPermutation_Plex(DM dm, IS *perm, PetscBT *blockStarts)
+{
+  DMReorderDefaultFlag reorder;
+  MatOrderingType      otype;
+  PetscBool            iscohesive, isreverse;
+
+  PetscFunctionBegin;
+  PetscCall(DMReorderSectionGetDefault(dm, &reorder));
+  if (reorder != DM_REORDER_DEFAULT_TRUE) PetscFunctionReturn(PETSC_SUCCESS);
+  PetscCall(DMReorderSectionGetType(dm, &otype));
+  if (!otype) PetscFunctionReturn(PETSC_SUCCESS);
+  PetscCall(PetscStrncmp(otype, "cohesive", 1024, &iscohesive));
+  PetscCall(PetscStrncmp(otype, "reverse", 1024, &isreverse));
+  if (iscohesive) {
+    PetscCall(DMCreateSectionPermutation_Plex_Cohesive(dm, perm, blockStarts));
+  } else if (isreverse) {
+    PetscCall(DMCreateSectionPermutation_Plex_Reverse(dm, perm, blockStarts));
+  }
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
+PetscErrorCode DMReorderSectionSetDefault_Plex(DM dm, DMReorderDefaultFlag reorder)
+{
+  PetscFunctionBegin;
+  dm->reorderSection = reorder;
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
+PetscErrorCode DMReorderSectionGetDefault_Plex(DM dm, DMReorderDefaultFlag *reorder)
+{
+  PetscFunctionBegin;
+  *reorder = dm->reorderSection;
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
+PetscErrorCode DMReorderSectionSetType_Plex(DM dm, MatOrderingType reorder)
+{
+  PetscFunctionBegin;
+  PetscCall(PetscFree(dm->reorderSectionType));
+  PetscCall(PetscStrallocpy(reorder, (char **)&dm->reorderSectionType));
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
+PetscErrorCode DMReorderSectionGetType_Plex(DM dm, MatOrderingType *reorder)
+{
+  PetscFunctionBegin;
+  *reorder = dm->reorderSectionType;
   PetscFunctionReturn(PETSC_SUCCESS);
 }

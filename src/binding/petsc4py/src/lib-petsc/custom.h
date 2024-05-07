@@ -10,6 +10,7 @@
 #include <petsc/private/snesimpl.h>
 #include <petsc/private/tsimpl.h>
 #include <petsc/private/taoimpl.h>
+#include <petsc/private/deviceimpl.h>
 
 /* ---------------------------------------------------------------- */
 
@@ -169,6 +170,7 @@ static
 PetscErrorCode VecGetCurrentMemType(Vec v, PetscMemType *m)
 {
   PetscBool bound;
+
   PetscFunctionBegin;
   PetscValidHeaderSpecific(v,VEC_CLASSID,1);
   PetscAssertPointer(m,2);
@@ -233,6 +235,7 @@ static
 PetscErrorCode MatGetCurrentMemType(Mat A, PetscMemType *m)
 {
   PetscBool bound;
+
   PetscFunctionBegin;
   PetscValidHeaderSpecific(A,MAT_CLASSID,1);
   PetscAssertPointer(m,2);
@@ -359,6 +362,67 @@ PetscErrorCode KSPConverged(KSP ksp,PetscInt iter,PetscReal rnorm,KSPConvergedRe
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
+typedef struct {
+  PetscBool prepend_custom;
+  PetscErrorCode (*convtest)(KSP, PetscInt, PetscReal, KSPConvergedReason *, void *);
+  PetscErrorCode (*convdestroy)(void *);
+  PetscErrorCode (*convtestcustom)(KSP, PetscInt, PetscReal, KSPConvergedReason *, void *);
+  void *convctx;
+} KSPConvergedNativeCtx;
+
+static
+PetscErrorCode KSPConvergedNative_Private(KSP ksp, PetscInt n, PetscReal rnorm, KSPConvergedReason *reason, void *cctx)
+{
+  KSPConvergedNativeCtx *ctx = (KSPConvergedNativeCtx *)cctx;
+
+  PetscFunctionBegin;
+  *reason = KSP_CONVERGED_ITERATING;
+  if (ctx->prepend_custom) {
+    PetscCall((*ctx->convtestcustom)(ksp, n, rnorm, reason, NULL));
+    if (*reason) {
+      PetscCall(PetscInfo(ksp, "User provided prepended Python convergence test reason %s KSP iterations=%" PetscInt_FMT ", rnorm=%g\n", KSPConvergedReasons[*reason], n, (double)rnorm));
+      PetscFunctionReturn(PETSC_SUCCESS);
+    }
+  }
+  PetscCall((*ctx->convtest)(ksp, n, rnorm, reason, ctx->convctx));
+  if (*reason) {
+    PetscCall(PetscInfo(ksp, "Default convergence test reason %s KSP iterations=%" PetscInt_FMT ", rnorm=%g\n", KSPConvergedReasons[*reason], n, (double)rnorm));
+    PetscFunctionReturn(PETSC_SUCCESS);
+  }
+  if (!ctx->prepend_custom) {
+    PetscCall((*ctx->convtestcustom)(ksp, n, rnorm, reason, NULL));
+    if (*reason) PetscCall(PetscInfo(ksp, "User provide appended Python convergence test reason %s KSP iterations=%" PetscInt_FMT ", rnorm=%g\n", KSPConvergedReasons[*reason], n, (double)rnorm));
+  }
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
+static PetscErrorCode KSPConvergedNative_Destroy(void *cctx)
+{
+  KSPConvergedNativeCtx *ctx = (KSPConvergedNativeCtx *)cctx;
+
+  PetscFunctionBegin;
+  PetscCheck(ctx, PETSC_COMM_SELF, PETSC_ERR_PLIB, "Missing context");
+  if (ctx->convdestroy) PetscCall((*ctx->convdestroy)(ctx->convctx));
+  PetscCall(PetscFree(ctx));
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
+static
+PetscErrorCode KSPAddConvergenceTest(KSP ksp, PetscErrorCode (*custom)(KSP, PetscInt, PetscReal, KSPConvergedReason *, void *), PetscBool prepend)
+{
+  KSPConvergedNativeCtx *ctx;
+
+  PetscFunctionBegin;
+  PetscValidHeaderSpecific(ksp,KSP_CLASSID,1);
+  PetscValidLogicalCollectiveBool(ksp,prepend,3);
+  PetscCall(PetscNew(&ctx));
+  ctx->convtestcustom = custom;
+  ctx->prepend_custom = prepend;
+  PetscCall(KSPGetAndClearConvergenceTest(ksp, &ctx->convtest, &ctx->convctx, &ctx->convdestroy));
+  PetscCall(KSPSetConvergenceTest(ksp, KSPConvergedNative_Private, ctx, KSPConvergedNative_Destroy));
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
 static
 PetscErrorCode KSPLogHistory(KSP ksp,PetscReal rnorm)
 {
@@ -453,7 +517,6 @@ PetscErrorCode SNESSetUseMFFD(SNES snes,PetscBool flag)
     if (!shell && !python) PetscCall(PCSetType(pc,PCNONE));
   } else PetscCall(SNESSetJacobian(snes,J,0,0,0));
   PetscCall(MatDestroy(&J));
-
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
@@ -592,6 +655,7 @@ static
 PetscErrorCode TaoGetVecs(Tao tao, Vec *X, Vec *G, Vec *S)
 {
   PetscBool has_g;
+
   PetscFunctionBegin;
   PetscValidHeaderSpecific(tao,TAO_CLASSID,1);
   PetscCall(TaoHasGradientRoutine(tao,&has_g));
@@ -645,6 +709,14 @@ PetscErrorCode DMDACreateND(MPI_Comm comm,
   PetscCall(DMDASetStencilType(da,stencil_type));
   PetscCall(DMDASetStencilWidth(da,stencil_width));
   *dm = (DM)da;
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
+static
+PetscErrorCode PetscDeviceReference(PetscDevice device)
+{
+  PetscFunctionBegin;
+  PetscCall(PetscDeviceReference_Internal(device));
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 

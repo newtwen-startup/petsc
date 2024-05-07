@@ -327,7 +327,7 @@ PetscErrorCode ComputeRHS_MOAB(KSP ksp, Vec b, void *ptr)
     PetscCall(VecSetValuesLocal(b, nconn, dof_indices, localv, ADD_VALUES));
   }
 
-  /* force right hand side to be consistent for singular matrix */
+  /* force right-hand side to be consistent for singular matrix */
   /* note this is really a hack, normally the model would provide you with a consistent right handside */
   if (user->bcType == NEUMANN && false) {
     MatNullSpace nullspace;
@@ -561,7 +561,7 @@ PetscErrorCode InitializeOptions(UserContext *user)
 /*TEST
 
    build:
-      requires: moab
+      requires: moab !complex
 
    test:
       args: -levels 1 -nu .01 -n 4 -mg -ksp_converged_reason

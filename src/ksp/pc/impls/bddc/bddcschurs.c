@@ -1153,23 +1153,23 @@ PetscErrorCode PCBDDCSubSchursSetUp(PCBDDCSubSchurs sub_schurs, Mat Ain, Mat Sin
           /* perform sparse rank updates on symmetric Schur (TODO: move outside of the loop?) */
           /* cs_AIB already scaled by 1./nz */
           B_k = 1;
+          PetscCall(PetscBLASIntCast(size_schur, &B_n));
           for (k = 0; k < benign_n; k++) {
             sum = sums[k];
-            PetscCall(PetscBLASIntCast(size_schur, &B_n));
 
             if (PetscAbsScalar(sum) == 0.0) continue;
             if (k == i) {
-              PetscCallBLAS("BLASsyrk", BLASsyrk_("L", "N", &B_n, &B_k, &sum, cs_AIB + i * size_schur, &B_n, &one, S_data, &B_n));
-              if (matl_dbg_viewer) PetscCallBLAS("BLASsyrk", BLASsyrk_("L", "N", &B_n, &B_k, &sum, cs_AIB + i * size_schur, &B_n, &one, S3_data, &B_n));
+              if (B_n) PetscCallBLAS("BLASsyrk", BLASsyrk_("L", "N", &B_n, &B_k, &sum, cs_AIB + i * size_schur, &B_n, &one, S_data, &B_n));
+              if (matl_dbg_viewer && B_n) PetscCallBLAS("BLASsyrk", BLASsyrk_("L", "N", &B_n, &B_k, &sum, cs_AIB + i * size_schur, &B_n, &one, S3_data, &B_n));
             } else { /* XXX Is it correct to use symmetric rank-2 update with half of the sum? */
               sum /= 2.0;
-              PetscCallBLAS("BLASsyr2k", BLASsyr2k_("L", "N", &B_n, &B_k, &sum, cs_AIB + k * size_schur, &B_n, cs_AIB + i * size_schur, &B_n, &one, S_data, &B_n));
-              if (matl_dbg_viewer) PetscCallBLAS("BLASsyr2k", BLASsyr2k_("L", "N", &B_n, &B_k, &sum, cs_AIB + k * size_schur, &B_n, cs_AIB + i * size_schur, &B_n, &one, S3_data, &B_n));
+              if (B_n) PetscCallBLAS("BLASsyr2k", BLASsyr2k_("L", "N", &B_n, &B_k, &sum, cs_AIB + k * size_schur, &B_n, cs_AIB + i * size_schur, &B_n, &one, S_data, &B_n));
+              if (matl_dbg_viewer && B_n) PetscCallBLAS("BLASsyr2k", BLASsyr2k_("L", "N", &B_n, &B_k, &sum, cs_AIB + k * size_schur, &B_n, cs_AIB + i * size_schur, &B_n, &one, S3_data, &B_n));
             }
           }
           sum = 1.;
-          PetscCallBLAS("BLASsyr2k", BLASsyr2k_("L", "N", &B_n, &B_k, &sum, array + n_I, &B_n, cs_AIB + i * size_schur, &B_n, &one, S_data, &B_n));
-          if (matl_dbg_viewer) PetscCallBLAS("BLASsyr2k", BLASsyr2k_("L", "N", &B_n, &B_k, &sum, array + n_I, &B_n, cs_AIB + i * size_schur, &B_n, &one, S2_data, &B_n));
+          if (B_n) PetscCallBLAS("BLASsyr2k", BLASsyr2k_("L", "N", &B_n, &B_k, &sum, array + n_I, &B_n, cs_AIB + i * size_schur, &B_n, &one, S_data, &B_n));
+          if (matl_dbg_viewer && B_n) PetscCallBLAS("BLASsyr2k", BLASsyr2k_("L", "N", &B_n, &B_k, &sum, array + n_I, &B_n, cs_AIB + i * size_schur, &B_n, &one, S2_data, &B_n));
           PetscCall(VecRestoreArrayRead(v, (const PetscScalar **)&array));
           /* set p0 entry of AIIm1_ones to zero */
           PetscCall(ISGetLocalSize(is_p_r[i], &nz));
@@ -1183,7 +1183,7 @@ PetscErrorCode PCBDDCSubSchursSetUp(PCBDDCSubSchurs sub_schurs, Mat Ain, Mat Sin
           PetscCall(MatDenseRestoreArray(S2, &S2_data));
           PetscCall(MatDenseRestoreArray(S3, &S3_data));
         }
-        if (!S_lower_triangular) { /* I need to expand the upper triangular data (column oriented) */
+        if (!S_lower_triangular) { /* I need to expand the upper triangular data (column-oriented) */
           PetscInt k, j;
           for (k = 0; k < size_schur; k++) {
             for (j = k; j < size_schur; j++) S_data[j * size_schur + k] = PetscConj(S_data[k * size_schur + j]);
@@ -1359,7 +1359,7 @@ PetscErrorCode PCBDDCSubSchursSetUp(PCBDDCSubSchurs sub_schurs, Mat Ain, Mat Sin
         PetscCall(MatConvert(gdswA[i], MATDENSE, MAT_REUSE_MATRIX, &T));
         PetscCall(MatDestroy(&T));
       } else {
-        if (S_lower_triangular) { /* I need to expand the upper triangular data (column oriented) */
+        if (S_lower_triangular) { /* I need to expand the upper triangular data (column-oriented) */
           PetscInt k;
           for (k = 0; k < subset_size; k++) {
             for (j = k; j < subset_size; j++) {

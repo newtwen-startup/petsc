@@ -85,7 +85,7 @@ PetscErrorCode PetscSegBufferCreate(size_t unitbytes, size_t expected, PetscSegB
   Level: developer
 
 .seealso: `PetscSegBufferCreate()`, `PetscSegBufferExtractAlloc()`, `PetscSegBufferExtractTo()`, `PetscSegBufferExtractInPlace()`, `PetscSegBufferDestroy()`,
-          `PetscSegBuffer`
+          `PetscSegBuffer`, `PetscSegBufferGetInts()`
 @*/
 PetscErrorCode PetscSegBufferGet(PetscSegBuffer seg, size_t count, void *buf)
 {
@@ -150,7 +150,7 @@ PetscErrorCode PetscSegBufferExtractTo(PetscSegBuffer seg, void *contig)
   PetscFunctionBegin;
   unitbytes = seg->unitbytes;
   s         = seg->head;
-  ptr       = contig ? ((char *)contig) + s->tailused * unitbytes : NULL;
+  ptr       = PetscSafePointerPlusOffset((char *)contig, s->tailused * unitbytes);
   PetscCall(PetscMemcpy(ptr, s->u.array, s->used * unitbytes));
   for (t = s->tail; t;) {
     struct _PetscSegBufferLink *tail = t->tail;

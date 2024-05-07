@@ -36,16 +36,16 @@ static PetscErrorCode GenEntriesRectangular(PetscInt sdim, PetscInt M, PetscInt 
 
 int main(int argc, char **argv)
 {
-  Mat            A, AT, D, B, P, R, RT;
-  PetscInt       m = 100, dim = 3, M, K = 10, begin, n = 0, N, bs;
-  PetscMPIInt    size;
-  PetscScalar   *ptr;
-  PetscReal     *coords, *gcoords, *scoords, *gscoords, *(ctx[2]), norm, epsilon;
-  MatHtoolKernel kernel = GenEntries;
-  PetscBool      flg, sym = PETSC_FALSE;
-  PetscRandom    rdm;
-  IS             iss, ist, is[2];
-  Vec            right, left, perm;
+  Mat               A, AT, D, B, P, R, RT;
+  PetscInt          m = 100, dim = 3, M, K = 10, begin, n = 0, N, bs;
+  PetscMPIInt       size;
+  PetscScalar      *ptr;
+  PetscReal        *coords, *gcoords, *scoords, *gscoords, *ctx[2], norm, epsilon;
+  MatHtoolKernelFn *kernel = GenEntries;
+  PetscBool         flg, sym = PETSC_FALSE;
+  PetscRandom       rdm;
+  IS                iss, ist, is[2];
+  Vec               right, left, perm;
 
   PetscFunctionBeginUser;
   PetscCall(PetscInitialize(&argc, &argv, (char *)NULL, help));
@@ -244,13 +244,12 @@ int main(int argc, char **argv)
       suffix: 1
       nsize: 4
       args: -m_local 80 -n_local 25 -mat_htool_epsilon 1.0e-11 -symmetric {{false true}shared output}
-      output_file: output/ex101.out
 
    test:
       requires: htool
       suffix: 2
       nsize: 4
       args: -m_local 120 -mat_htool_epsilon 1.0e-2 -mat_htool_compressor {{sympartialACA fullACA SVD}shared output} -mat_htool_clustering {{PCARegular PCAGeometric BoundingBox1Regular BoundingBox1Geometric}shared output}
-      output_file: output/ex101.out
+      output_file: output/ex241_1.out
 
 TEST*/
